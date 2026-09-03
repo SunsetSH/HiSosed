@@ -1,0 +1,14 @@
+{
+  "title": "HiSosed",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up HiSosed",
+        "description": "Create the local HiSosed scheduler. Scenarios are configured from the HiSosed sidebar panel."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one HiSosed instance is allowed."
+    }
+  }
+}

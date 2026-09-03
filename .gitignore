@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+
+# Home Assistant runtime data and local media
+.storage/
+media/
+*.db
+*.db-shm
+*.db-wal
+home-assistant.log*
+
+# Frontend and editor artifacts
+node_modules/
+dist/
+.vscode/
+.idea/
+
+# Secrets and local configuration
+.env
+secrets.yaml
+configuration.yaml

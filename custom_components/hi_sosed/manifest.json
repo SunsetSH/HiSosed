@@ -1,0 +1,9 @@
+{
+  "domain": "hi_sosed",
+  "name": "HiSosed",
+  "config_flow": true,
+  "integration_type": "helper",
+  "single_config_entry": true,
+  "iot_class": "Local Push",
+  "version": "0.1.0"
+}

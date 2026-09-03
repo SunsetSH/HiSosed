@@ -1,0 +1,14 @@
+{
+  "title": "HiSosed",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Настройка HiSosed",
+        "description": "Создать локальный планировщик HiSosed. Сценарии настраиваются в панели HiSosed в боковом меню."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Разрешен только один экземпляр HiSosed."
+    }
+  }
+}

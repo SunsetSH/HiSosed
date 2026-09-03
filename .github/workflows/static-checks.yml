@@ -1,0 +1,26 @@
+name: Static checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Compile Python modules
+        run: python3 -m py_compile custom_components/hi_sosed/*.py
+      - name: Validate JSON metadata
+        run: |
+          jq empty hacs.json custom_components/hi_sosed/manifest.json
+          jq empty custom_components/hi_sosed/translations/en.json
+          jq empty custom_components/hi_sosed/translations/ru.json
+      - name: Check panel JavaScript syntax
+        run: node --check custom_components/hi_sosed/static/hi-sosed-panel.js
+      - name: Check shell installer syntax
+        run: sh -n scripts/install.sh

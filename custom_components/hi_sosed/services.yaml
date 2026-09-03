@@ -1,0 +1,28 @@
+start:
+  fields:
+    scenario_id:
+      required: true
+      selector:
+        text:
+stop:
+  fields:
+    scenario_id:
+      required: true
+      selector:
+        text:
+regenerate:
+  fields:
+    scenario_id:
+      required: true
+      selector:
+        text:
+preview:
+  fields:
+    scenario_id:
+      required: true
+      selector:
+        text:
+    media_content_id:
+      required: false
+      selector:
+        text:
