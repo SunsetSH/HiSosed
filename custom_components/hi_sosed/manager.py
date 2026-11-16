@@ -296,6 +296,8 @@ class ScenarioManager:
             for key in [key for key in self._runtimes if key[0] == scenario_id]:
                 self._invalidate_locked(key)
                 del self._runtimes[key]
+            for checkpoint_key in [item for item in self._checkpoint if item.startswith(f"{scenario_id}:")]:
+                del self._checkpoint[checkpoint_key]
             self._overrides.pop(scenario_id, None)
             self._scenarios = updated
             self._save_checkpoint()
@@ -675,11 +677,15 @@ class ScenarioManager:
         Awaiting the bounded Store write under the lock is deliberate (ADR-0003):
         publishing to memory only after a successful write keeps saves atomic.
         """
+        # Compare with None: an empty dict (the last item was deleted) must be persisted too.
+        sounds = self._sounds if sounds is None else sounds
+        outputs = self._outputs if outputs is None else outputs
+        scenarios = self._scenarios if scenarios is None else scenarios
         await self._store.async_save(
             {
-                "sounds": {key: item.as_dict() for key, item in (sounds or self._sounds).items()},
-                "outputs": {key: item.as_dict() for key, item in (outputs or self._outputs).items()},
-                "scenarios": {key: item.as_dict() for key, item in (scenarios or self._scenarios).items()},
+                "sounds": {key: item.as_dict() for key, item in sounds.items()},
+                "outputs": {key: item.as_dict() for key, item in outputs.items()},
+                "scenarios": {key: item.as_dict() for key, item in scenarios.items()},
             }
         )
 
@@ -993,14 +999,19 @@ class ScenarioManager:
             scenario, layer, _ = current
             targets = [t for t in scenario.layer_targets(layer) if t in self._outputs]
         for target in targets:
+            # Each call can take seconds; a stop in the meantime must reach the next target.
+            async with self._lock:
+                if self._current(key, generation) is None:
+                    return
             state = self.hass.states.get(target)
-            if state is None or state.state == "unavailable":
+            output = self._outputs.get(target)
+            if state is None or state.state == "unavailable" or output is None:
                 continue
             try:
                 features = int(state.attributes.get("supported_features") or 0)
                 if state.state in ("off", "standby") and features & _FEATURE_TURN_ON:
                     await self._async_call(target, "turn_on", {})
-                if self._outputs[target].kind == "bluetooth":
+                if output.kind == "bluetooth":
                     await self._async_call(
                         target,
                         "play_media",

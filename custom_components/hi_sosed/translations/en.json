@@ -4,12 +4,12 @@
     "step": {
       "user": {
         "title": "Set up HiSosed",
-        "description": "Create the local HiSosed scheduler. Scenarios, sounds and speakers are configured in the HiSosed sidebar panel."
+        "description": "HiSosed runs right here, with no internet needed. Programs, sounds and speakers are set up later in the HiSosed panel in the sidebar."
       }
     },
     "abort": {
-      "single_instance_allowed": "Only one HiSosed instance is allowed.",
-      "already_configured": "HiSosed is already configured."
+      "single_instance_allowed": "HiSosed can only be added once.",
+      "already_configured": "HiSosed is already added."
     }
   },
   "entity": {
@@ -27,19 +27,19 @@
       "status": {
         "name": "Status",
         "state": {
-          "disabled": "Disabled",
-          "idle": "Not configured",
+          "disabled": "Off",
+          "idle": "Not ready",
           "waiting": "Waiting",
-          "running": "Running",
-          "snoozed": "Snoozed",
-          "error": "Player error"
+          "running": "Playing",
+          "snoozed": "Quiet",
+          "error": "Speaker problem"
         },
         "state_attributes": {
           "next_window": {
-            "name": "Next window"
+            "name": "Next start"
           },
           "manual_until": {
-            "name": "Manual run until"
+            "name": "Started by hand until"
           }
         }
       }
@@ -47,116 +47,116 @@
   },
   "services": {
     "start": {
-      "name": "Enable schedule",
-      "description": "Enables the scenario; sound plays only inside its time windows.",
+      "name": "Turn the schedule on",
+      "description": "The program will play by itself, but only at its scheduled times.",
       "fields": {
         "scenario_id": {
-          "name": "Scenario",
-          "description": "Scenario id or exact name."
+          "name": "Program",
+          "description": "The program's name or ID."
         }
       }
     },
     "stop": {
       "name": "Stop",
-      "description": "Immediately stops the scenario and disables its schedule.",
+      "description": "Silences the program right away and turns its schedule off.",
       "fields": {
         "scenario_id": {
-          "name": "Scenario",
-          "description": "Scenario id or exact name."
+          "name": "Program",
+          "description": "The program's name or ID."
         }
       }
     },
     "run_now": {
-      "name": "Run now",
-      "description": "Plays now for the given minutes regardless of the schedule.",
+      "name": "Play now",
+      "description": "The program plays right now for the given number of minutes, ignoring the schedule.",
       "fields": {
         "scenario_id": {
-          "name": "Scenario",
-          "description": "Scenario id or exact name."
+          "name": "Program",
+          "description": "The program's name or ID."
         },
         "minutes": {
           "name": "Minutes",
-          "description": "Manual run duration."
+          "description": "How many minutes to play."
         }
       }
     },
     "regenerate": {
-      "name": "Regenerate grid",
-      "description": "Replaces future cells of the current cycle.",
+      "name": "Shuffle",
+      "description": "Picks new moments for the sounds for the rest of the current cycle.",
       "fields": {
         "scenario_id": {
-          "name": "Scenario",
-          "description": "Scenario id or exact name."
+          "name": "Program",
+          "description": "The program's name or ID."
         },
         "layer": {
           "name": "Layer",
-          "description": "Layer id or name; empty means all."
+          "description": "Layer name or ID. Leave empty to shuffle all of them."
         }
       }
     },
     "apply_preset": {
-      "name": "Apply preset",
-      "description": "Switches layers, sounds, density and volume to a saved preset.",
+      "name": "Switch mode",
+      "description": "Switches layers, sounds, frequency and volume to a saved mode.",
       "fields": {
         "scenario_id": {
-          "name": "Scenario",
-          "description": "Scenario id or exact name."
+          "name": "Program",
+          "description": "The program's name or ID."
         },
         "preset": {
-          "name": "Preset",
-          "description": "Preset id or name."
+          "name": "Mode",
+          "description": "Mode name or ID."
         }
       }
     },
     "set_layer": {
-      "name": "Toggle layer",
-      "description": "Turns a layer on or off without deleting it.",
+      "name": "Turn a layer on or off",
+      "description": "Turns a layer on or mutes it without deleting anything.",
       "fields": {
         "scenario_id": {
-          "name": "Scenario",
-          "description": "Scenario id or exact name."
+          "name": "Program",
+          "description": "The program's name or ID."
         },
         "layer": {
           "name": "Layer",
-          "description": "Layer id or name."
+          "description": "Layer name or ID."
         },
         "enabled": {
-          "name": "Enabled",
-          "description": "New layer state."
+          "name": "On",
+          "description": "Whether the layer should be on."
         }
       }
     },
     "preview": {
-      "name": "Preview sound",
+      "name": "Listen to a sound",
       "description": "Plays one library sound once.",
       "fields": {
         "sound_id": {
           "name": "Sound",
-          "description": "Library sound id."
+          "description": "Library sound ID."
         },
         "entity_id": {
-          "name": "Players",
-          "description": "Where to play; defaults to the scenario players."
+          "name": "Speakers",
+          "description": "Where to play. If empty, the program's speakers are used."
         },
         "scenario_id": {
-          "name": "Scenario",
-          "description": "Scenario id or exact name."
+          "name": "Program",
+          "description": "The program's name or ID."
         }
       }
     },
     "snooze": {
-      "name": "Snooze",
-      "description": "Silences every scenario for a while. Skipped sounds are not replayed.",
+      "name": "Quiet",
+      "description": "Silences every program for a while. Whatever would have played during that time is not made up later.",
       "fields": {
         "minutes": {
           "name": "Minutes",
-          "description": "Snooze duration."
+          "description": "How many minutes to stay quiet."
         }
       }
     },
     "resume": {
-      "name": "Resume",
-      "description": "Ends the snooze early."
+      "name": "Sound back on",
+      "description": "Ends the quiet time early."
     }
   }
 }

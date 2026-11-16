@@ -228,3 +228,24 @@ async def test_bluetooth_keepalive_plays_silence_in_long_gaps(hass: HomeAssistan
     silent = [uri for uri in players.plays(include_system=True) if uri.endswith("silence.wav")]
     assert 2 <= len(silent) <= 3
     assert players.plays() == []
+
+
+async def test_stop_during_warmup_skips_remaining_targets(hass: HomeAssistant, setup_integration, freezer) -> None:
+    """A stop that lands while one speaker is being woken up reaches the next speaker."""
+    manager, players, _ = await setup_integration()
+    freezer.move_to("2026-11-16 09:59:00+01:00")
+    for target in (KITCHEN, HALL):
+        await manager.async_save_output({"entity_id": target, "kind": "bluetooth", "warmup_seconds": 30})
+    sound_id = await add_sound(manager)
+    saved = await manager.async_save_scenario(scenario_payload([sound_id], target_entity_ids=[KITCHEN, HALL]))
+    key = (saved["id"], saved["layers"][0]["id"])
+    generation = manager._runtimes[key].generation
+    original = manager._async_call
+
+    async def call_then_stop(entity_id: str, service: str, data: dict) -> None:
+        await original(entity_id, service, data)
+        await manager.async_stop(saved["id"])
+
+    manager._async_call = call_then_stop
+    await manager._async_prepare(key, generation)
+    assert len(players.plays(include_system=True)) == 1

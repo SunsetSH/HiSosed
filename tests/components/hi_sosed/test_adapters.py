@@ -14,6 +14,7 @@ from homeassistant.helpers import entity_registry as er
 
 from custom_components.hi_sosed.audio import beep_wav
 from custom_components.hi_sosed.const import DOMAIN, STORAGE_KEY
+from custom_components.hi_sosed.manager import ScenarioManager
 
 from .conftest import KITCHEN, add_sound, scenario_payload
 
@@ -224,3 +225,19 @@ async def test_v1_storage_is_migrated(hass: HomeAssistant, setup_integration, ha
     scenario = manager.scenario("33333333-3333-3333-3333-333333333333")
     assert scenario is not None and scenario.name == "Старый"
     assert len(manager.get_state()["sounds"]) == 1
+
+
+async def test_deleting_last_items_is_persisted(hass: HomeAssistant, setup_integration) -> None:
+    """Removing the last scenario, sound and output must reach the Store, not only memory."""
+    manager, _, _ = await setup_integration()
+    sound_id = await add_sound(manager)
+    saved = await manager.async_save_scenario(scenario_payload([sound_id]))
+    await manager.async_save_output({"entity_id": KITCHEN, "kind": "jack"})
+    await manager.async_delete_scenario(saved["id"])
+    await manager.async_delete_sound(sound_id)
+    await manager.async_delete_output(KITCHEN)
+    await hass.async_block_till_done()
+    reloaded = ScenarioManager(hass)
+    await reloaded.async_initialize()
+    state = reloaded.get_state()
+    assert (state["scenarios"], state["sounds"], state["outputs"]) == ([], [], [])
