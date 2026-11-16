@@ -233,18 +233,60 @@ EOF
   /usr/local/bin/hisosed-unmute
 
   # HDA cards also expose HDMI outputs; prefer the analog one (3.5 mm / line out).
-  sink=""
-  n=0
-  while [ "$n" -lt 15 ]; do
-    sink="$(as_user pactl list short sinks 2>/dev/null | awk '{print $2}' | grep -i analog | head -n 1 || true)"
-    [ -n "$sink" ] && break
-    sleep 1
-    n=$((n + 1))
-  done
+  find_sink() {
+    sink=""
+    n=0
+    while [ "$n" -lt "$1" ]; do
+      sink="$(as_user pactl list short sinks 2>/dev/null | awk '{print $2}' | grep -iE 'analog|hisosed_jack' | head -n 1 || true)"
+      [ -n "$sink" ] && return 0
+      sleep 1
+      n=$((n + 1))
+    done
+  }
+  find_sink 15
+  if [ -z "$sink" ]; then
+    # An LXC container has no udev, so WirePlumber never sees the cards even though
+    # /dev/snd is there. Declare the first non-HDMI playback device as a static node.
+    pcm=""
+    for info in /proc/asound/card*/pcm*p/info; do
+      [ -r "$info" ] || continue
+      case "$(sed -n 's/^name: //p' "$info")" in *HDMI*|*DisplayPort*) continue ;; esac
+      pcm="hw:$(sed -n 's/^card: //p' "$info"),$(sed -n 's/^device: //p' "$info")"
+      break
+    done
+    if [ -n "$pcm" ]; then
+      echo "==> Adding output $pcm to PipeWire"
+      install -d -o "$user" -g "$user" "$home/.config/pipewire" "$home/.config/pipewire/pipewire.conf.d"
+      cat > "$home/.config/pipewire/pipewire.conf.d/80-hisosed-jack.conf" <<EOF
+context.objects = [
+  { factory = adapter
+    args = {
+      factory.name     = api.alsa.pcm.sink
+      node.name        = "hisosed_jack"
+      node.description = "HiSosed jack"
+      media.class      = "Audio/Sink"
+      api.alsa.path    = "$pcm"
+      priority.driver  = 2000
+      priority.session = 2000
+    }
+  }
+]
+EOF
+      chown "$user:$user" "$home/.config/pipewire/pipewire.conf.d/80-hisosed-jack.conf"
+      as_user systemctl --user restart pipewire.service pipewire-pulse.service wireplumber.service
+      # MPD keeps a dead connection to the old PipeWire; restart the players too.
+      i=0
+      while [ "$i" -lt "$players" ]; do
+        as_user systemctl --user restart "hisosed-mpd@$i.service" || true
+        i=$((i + 1))
+      done
+      find_sink 15
+    fi
+  fi
   if [ -n "$sink" ]; then
     as_user pactl set-default-sink "$sink" || echo "WARNING: could not select $sink" >&2
   else
-    echo "WARNING: no analog output found. Check: aplay -l" >&2
+    echo "WARNING: no analog output found. Check: hisosed-check" >&2
   fi
 fi
 
@@ -259,9 +301,19 @@ as_user() {
 }
 echo "== Sound cards"
 cat /proc/asound/cards 2>/dev/null || echo "none"
+echo "== Playback devices"
+for info in /proc/asound/card*/pcm*p/info; do
+  [ -r "$info" ] || continue
+  echo "  hw:$(sed -n 's/^card: //p' "$info"),$(sed -n 's/^device: //p' "$info") $(sed -n 's/^name: //p' "$info")"
+done
 echo "== Outputs (* = used by HiSosed)"
 default="$(as_user pactl get-default-sink 2>/dev/null || true)"
-as_user pactl list short sinks 2>/dev/null | awk -v d="$default" '{ print ($2 == d ? "* " : "  ") $2 }'
+sinks="$(as_user pactl list short sinks 2>/dev/null || true)"
+if [ -n "$sinks" ]; then
+  echo "$sinks" | awk -v d="$default" '{ print ($2 == d ? "* " : "  ") $2 }'
+else
+  echo "  none: PipeWire sees no output. Re-run the installer."
+fi
 echo "== Players"
 as_user systemctl --user --no-legend list-units 'hisosed-mpd@*' 2>/dev/null
 if [ -s /etc/hisosed/bt-mac ]; then

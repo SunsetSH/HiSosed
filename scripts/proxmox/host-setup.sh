@@ -320,7 +320,7 @@ pair_speaker() {
     say "Pairing the speaker (attempt $attempt of 5)"
     printf 'Put the speaker into pairing mode and press Enter... '
     read -r _ <&3 || break
-    devices="$(gexec 60 hisosed-bt-scan 2>/dev/null || true)"
+    devices="$(gexec 60 /usr/local/bin/hisosed-bt-scan 2>/dev/null || true)"
     if [ -z "$devices" ]; then
       echo "Nothing found."
       continue
@@ -331,7 +331,7 @@ pair_speaker() {
     case "$choice" in ''|*[!0-9]*) continue ;; esac
     mac="$(echo "$devices" | sed -n "${choice}p" | cut -d' ' -f1)"
     [ -n "$mac" ] || continue
-    if gexec 60 hisosed-bt-pair "$mac"; then
+    if gexec 60 /usr/local/bin/hisosed-bt-pair "$mac"; then
       exec 3<&-
       return 0
     fi
@@ -345,11 +345,11 @@ run_check() {
   if [ "$mode" = jack ]; then
     [ -n "$vmid" ] || vmid="$(find_ct)"
     [ -n "$vmid" ] || die "no $ct_name container yet; run without --check first"
-    pct exec "$vmid" -- hisosed-check
+    pct exec "$vmid" -- /usr/local/bin/hisosed-check || die "the check failed; run this script again without --check to reinstall the node"
   else
     [ -n "$vmid" ] || vmid="$(find_vm)"
     [ -n "$vmid" ] || die "no $vm_name VM yet; run without --check first"
-    gexec 60 hisosed-check
+    gexec 60 /usr/local/bin/hisosed-check || die "the check failed; run this script again without --check to reinstall the node"
   fi
 }
 

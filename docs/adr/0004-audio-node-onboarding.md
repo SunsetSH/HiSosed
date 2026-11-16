@@ -37,6 +37,7 @@
      - `--check` запускает `hisosed-check`: показывает карты, выходы и плееры и проигрывает тестовую фразу;
      - в конце скрипт печатает адрес узла.
 2. **`audio-node.sh`** дополнен:
+   - в LXC нет udev, и WirePlumber не видит карты, хотя `/dev/snd` проброшен. Если аналоговый sink не появился сам, первый не-HDMI PCM из `/proc/asound` объявляется статическим узлом PipeWire (`context.objects`, `api.alsa.pcm.sink`, `hisosed_jack`). Найденный автоматически sink не трогается: на обычной машине с udev два открытия одного `hw:` конфликтовали бы;
    - режим jack при каждой загрузке снимает mute с кодека (`hisosed-unmute.service`: на хосте Proxmox нет alsa-utils, и после перезагрузки кодек приглушён) и выбирает аналоговый выход вместо HDMI;
    - режим Bluetooth ставит non-free-firmware для адаптеров Intel и Realtek;
    - появились `hisosed-check` и неинтерактивный `hisosed-bt-pair MAC`;
