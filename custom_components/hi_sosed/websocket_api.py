@@ -11,7 +11,16 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
-from .const import DATA_MANAGER, DOMAIN, MAX_RUN_NOW_MINUTES, MAX_SNOOZE_MINUTES, SIGNAL_UPDATE
+from . import nodes
+from .const import (
+    DATA_MANAGER,
+    DOMAIN,
+    MAX_RUN_NOW_MINUTES,
+    MAX_SNOOZE_MINUTES,
+    NODE_KINDS,
+    NODE_MAX_PLAYERS,
+    SIGNAL_UPDATE,
+)
 from .manager import ScenarioManager
 from .models import HiSosedError
 
@@ -240,6 +249,26 @@ async def ws_output_test(hass, connection, msg, manager):
     await manager.async_test_output(msg["entity_id"])
 
 
+@_command(
+    {
+        vol.Required("type"): "hi_sosed/node/connect",
+        vol.Required("host"): vol.All(str, vol.Length(min=1, max=253)),
+        vol.Optional("players", default=2): vol.All(int, vol.Range(min=1, max=NODE_MAX_PLAYERS)),
+        vol.Optional("kind", default="jack"): vol.In(list(NODE_KINDS)),
+        vol.Optional("name", default="HiSosed"): vol.All(str, vol.Length(max=40)),
+    }
+)
+async def ws_node_connect(hass, connection, msg, manager):
+    """Add the MPD players of an audio node and give new ones a speaker profile."""
+    host = nodes.validate_host(msg["host"])
+    players = await nodes.async_connect_node(hass, host, msg["players"], msg["name"].strip() or "HiSosed")
+    for player in players:
+        entity_id = player["entity_id"]
+        if entity_id and manager.output(entity_id) is None:
+            await manager.async_save_output({"entity_id": entity_id, "kind": msg["kind"], **NODE_KINDS[msg["kind"]]})
+    return {"players": players, "local_url": nodes.has_local_url(hass)}
+
+
 def async_register_commands(hass: HomeAssistant) -> None:
     """Register once during component setup."""
     for command in (
@@ -258,5 +287,6 @@ def async_register_commands(hass: HomeAssistant) -> None:
         ws_output_save,
         ws_output_delete,
         ws_output_test,
+        ws_node_connect,
     ):
         websocket_api.async_register_command(hass, command)

@@ -16,21 +16,21 @@
 - WS-подписка вместо событий шины (Recorder не засоряется);
 - новая панель: Shadow DOM, автосохранение, живая сетка, мобильная раскладка, тёмная тема HA, ru/en, клавиатура, ARIA;
 - миграция хранилища v1 → v2;
-- скрипт аудиоузла для Proxmox (`scripts/proxmox/audio-node.sh`) и руководство [PROXMOX_AUDIO.md](PROXMOX_AUDIO.md);
-- 60 тестов pytest (домен + интеграция с ядром HA), CI запускает pytest на Linux.
+- аудиоузел для Proxmox одной командой (`scripts/proxmox/host-setup.sh`: LXC для провода, ВМ для Bluetooth) и кнопка «Подключить» в панели, которая сама добавляет плееры MPD ([ADR-0004](adr/0004-audio-node-onboarding.md), [PROXMOX_AUDIO.md](PROXMOX_AUDIO.md));
+- 79 тестов pytest (домен + интеграция с ядром HA), CI запускает pytest на Linux.
 
 ## Проверки рабочего окружения (Windows)
 
 - `python -m py_compile custom_components/hi_sosed/*.py`: пройдено;
 - JSON manifest, translations, hacs.json: пройдено; ключи ru/en совпадают;
 - `node --check` панели: пройдено;
-- `sh -n scripts/install.sh scripts/proxmox/audio-node.sh`: пройдено;
-- `PYTHONPATH=tests/windows_shims .venv/Scripts/python -m pytest`: 60 passed (HA 2026.2.3, заглушки `fcntl`/`resource`);
+- `sh -n` для `scripts/install.sh`, `scripts/proxmox/audio-node.sh`, `scripts/proxmox/host-setup.sh`: пройдено;
+- `PYTHONPATH=tests/windows_shims .venv/Scripts/python -m pytest`: 79 passed (HA 2026.2.3, заглушки `fcntl`/`resource`);
 - панель: smoke-сценарий в jsdom (ru и en, без JS-ошибок) и скриншоты headless Edge с моком `hass`.
 
 ## До первого релиза
 
 - запуск в живом Home Assistant OS и проверка панели в браузере Windows и в Android companion app;
-- hardware probe: Bluetooth-колонка через `audio-node.sh`, USB-карта + VLC add-on, задержки после 5–30 с тишины, keep-alive;
+- hardware probe: `host-setup.sh` на PVE 8/9 (встроенный HDA-кодек, USB-карта, Bluetooth-адаптеры Intel/Realtek/CSR), сопряжение, задержки после 5–30 с тишины, keep-alive;
 - Hassfest и HACS validation в CI, Ruff;
 - release tag и release notes.

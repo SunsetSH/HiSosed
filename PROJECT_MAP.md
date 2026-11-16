@@ -17,6 +17,7 @@ custom_components/hi_sosed/     # сама интеграция (HACS публи
   manager.py                    # ПРИКЛАДНОЙ СЛОЙ: данные, планировщик дорожек, воспроизведение, keep-alive
   storage.py                    # Store v2 с миграцией + RuntimeStore (checkpoint)
   websocket_api.py              # адаптер: WS-команды панели (все require_admin)
+  nodes.py                      # адаптер: подключение плееров аудиоузла через встроенный config flow MPD (ADR-0004)
   http.py                       # адаптер: POST /api/hi_sosed/upload
   entity.py                     # база сущностей + динамическое добавление/удаление
   switch.py / select.py / sensor.py  # сущности программ, дорожек, пресетов, состояния
@@ -32,8 +33,10 @@ tests/
     test_engine.py / test_models.py   # чистый домен
     test_scheduler.py           # планировщик, гонки, рестарт, ошибки плееров, snooze, run_now, keep-alive
     test_adapters.py            # WS, upload, сущности, сервисы, удаление, миграция Store
+    test_nodes.py               # hi_sosed/node/connect: проверка адреса, MPD flow, имена, профили
 scripts/install.sh              # установка из GitHub-архива с backup
-scripts/proxmox/audio-node.sh   # аудиоузел Debian: N×MPD + PipeWire (+ Bluetooth)
+scripts/proxmox/host-setup.sh   # одна команда на хосте Proxmox: LXC (jack) или ВМ (Bluetooth) + audio-node.sh
+scripts/proxmox/audio-node.sh   # аудиоузел Debian: N×MPD + PipeWire (+ Bluetooth), hisosed-check, hisosed-unmute
 docs/                           # спецификация, архитектура, ADR, PROXMOX_AUDIO.md
 pyproject.toml                  # конфигурация pytest (pythonpath, asyncio_mode)
 .github/workflows/static-checks.yml  # CI: синтаксис + pytest на Linux
@@ -91,7 +94,7 @@ panel.js ──WS──> websocket_api ─┐            switch/select/sensor �
 | Группа | Методы |
 |---|---|
 | Жизненный цикл | `async_initialize` (Store + checkpoint + системные WAV), `async_start_all` (+ таймер `_tick`), `async_shutdown` (инвалидация, flush checkpoint) |
-| Чтение | `get_state`, `scenario`, `scenario_ids`, `serialize_scenario`, `runtime_view`, `status`, `sound_usage` |
+| Чтение | `get_state`, `scenario`, `output`, `scenario_ids`, `serialize_scenario`, `runtime_view`, `status`, `sound_usage` |
 | Сценарии | `async_save_scenario` (ревизия → `revision_conflict`, проверка ссылок → `unknown_sound`), `async_delete_scenario`, `async_set_enabled`, `async_set_layer_enabled`, `async_set_sound_enabled`, `async_apply_preset`, `async_capture_preset` |
 | Запуск | `async_start`/`async_stop` (= `enabled` true/false, сохраняется), `async_run_now`, `async_cancel_run_now`, `async_regenerate(layer?)`, `async_snooze`, `async_resume`, `async_preview`, `async_test_output` |
 | Колонки | `async_save_output`, `async_delete_output` |
@@ -130,6 +133,7 @@ lock: generation совпал? → played/error/skipped
 | `hi_sosed/snooze` | `minutes` (0 = снять) | `null` |
 | `hi_sosed/sound/update|delete|add_uri|scan|starter|preview` | см. код | `{sound}` / `{added}` / `null` |
 | `hi_sosed/output/save|delete|test` | `output` / `entity_id` | `{output}` / `null` |
+| `hi_sosed/node/connect` | `host` (IP/DNS, иначе `invalid_host`), `players` 1–4, `kind` jack\|bluetooth, `name` | `{players: [{port, status added\|exists\|cannot_connect\|unavailable, entity_id}], local_url}`; новым колонкам создаётся профиль `kind` |
 
 `runtime`: `{state (disabled|idle|waiting|running|snoozed|error), override_until, layers: {layer_id: {state, issue, last_error, next_event, window_start, window_end, cycle_index, pattern "0101…", next_slot, played_count, skipped_count, error_count, last_played_at}}}`.
 
@@ -157,6 +161,7 @@ lock: generation совпал? → played/error/skipped
 - `_uploadOne`: XHR с Bearer-токеном и прогрессом; drag&drop в библиотеку или прямо в дорожку;
 - `_playBrowser`: `media_source/resolve_media` → `<audio>`. `_playSpeaker`: `hi_sosed/sound/preview`;
 - `_dialog` и подобные: собственные модальные окна вместо `confirm/prompt`;
+- карточка «Подключить колонку к серверу» (`_nodeHtml`, `_connectNode`, состояние `_node`) собирает команду `host-setup.sh` и вызывает `hi_sosed/node/connect`. Блок «Если что-то не получается» (`_guideHtml`) — диагностика `--check`, `--pair`, ручное добавление MPD. `_copy` работает и по http (fallback на `execCommand`);
 - id новых сущностей генерирует клиент (`uuid()` на `crypto.getRandomValues`, работает и по http).
 
 ## 6. Где что искать
@@ -183,5 +188,5 @@ lock: generation совпал? → played/error/skipped
 3. Ручной запуск и пресеты расширяют исходный MVP (ADR-0003). ARCHITECTURE.md §10–12 частично устарел, актуальная картина — здесь и в ADR-0003.
 4. `hi_sosed/state` доступен только админу, а ARCHITECTURE §10 требует чтения для любого пользователя. Не-админам состояние видно через сущности.
 5. Hassfest и HACS validation не настроены. Ruff не запускается (в окружении нет).
-6. Скрипт `audio-node.sh`, Bluetooth-переподключение, задержки A2DP, VLC и MPD на реальном железе не проверены. Панель проверена в jsdom и в headless Edge с моком `hass`, но не в живом HA и не в Android companion app.
+6. Скрипты `host-setup.sh` и `audio-node.sh`, Bluetooth-переподключение, задержки A2DP и MPD на реальном Proxmox и железе не проверены (только `sh -n`). Подключение через MPD flow покрыто тестами с подменой flow, сама интеграция MPD в тестах не загружается. Панель проверена в jsdom и в headless Edge с моком `hass`, но не в живом HA и не в Android companion app.
 7. Тесты на Windows идут только с заглушками `tests/windows_shims`. Официально HA на Windows не поддерживается, эталон — CI на Linux.

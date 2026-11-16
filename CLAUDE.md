@@ -28,6 +28,7 @@ for f in hacs.json custom_components/hi_sosed/manifest.json custom_components/hi
 node --check custom_components/hi_sosed/static/hi-sosed-panel.js
 sh -n scripts/install.sh
 sh -n scripts/proxmox/audio-node.sh
+sh -n scripts/proxmox/host-setup.sh
 ```
 
 Тесты. Нужен venv с Home Assistant (пакет `custom_components.hi_sosed` импортирует HA). Конфигурация pytest лежит в `pyproject.toml` (`pythonpath`, `asyncio_mode`, `-p no:cacheprovider`). На Windows HA 2026.2 требует `lru-dict==1.3.0` без готового wheel, поэтому ставим через uv с override, а POSIX-модули подменяем заглушками:

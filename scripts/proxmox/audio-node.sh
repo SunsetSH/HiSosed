@@ -4,9 +4,10 @@
 # or Bluetooth speaker. PipeWire mixes the players, so HiSosed layers assigned to
 # different players sound at the same time.
 #
-#   sudo sh audio-node.sh --mode jack|bluetooth [--players N] [--user NAME]
+#   sh audio-node.sh --mode jack|bluetooth [--players N] [--user NAME]   (as root)
 #
-# Nothing here talks to the Internet except apt. Re-running is safe.
+# Usually started by host-setup.sh on the Proxmox host. Nothing here talks to the
+# Internet except apt. Re-running is safe.
 set -eu
 
 mode=""
@@ -30,7 +31,7 @@ done
 
 case "$mode" in jack|bluetooth) ;; *) usage ;; esac
 case "$players" in 1|2|3|4) ;; *) echo "--players must be 1..4" >&2; exit 2 ;; esac
-[ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo)." >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || { echo "Run as root." >&2; exit 1; }
 command -v apt-get >/dev/null || { echo "Debian/Ubuntu with apt is required." >&2; exit 1; }
 
 echo "==> Installing packages"
@@ -40,6 +41,16 @@ packages="mpd pipewire pipewire-pulse wireplumber pulseaudio-utils dbus-user-ses
 [ "$mode" = bluetooth ] && packages="$packages bluez libspa-0.2-bluetooth"
 # shellcheck disable=SC2086
 apt-get install -y -q $packages
+
+if [ "$mode" = bluetooth ] && grep -q '^ID=debian' /etc/os-release; then
+  # Intel and Realtek adapters do not start without non-free firmware; Debian cloud images ship only "main".
+  codename="$(sed -n 's/^VERSION_CODENAME=//p' /etc/os-release)"
+  echo "deb http://deb.debian.org/debian $codename non-free-firmware" > /etc/apt/sources.list.d/hisosed-firmware.list
+  apt-get update -q
+  apt-get install -y -q firmware-misc-nonfree firmware-realtek firmware-iwlwifi || true
+  # Reload the driver so freshly installed firmware is picked up without a reboot.
+  modprobe -r btusb 2>/dev/null && modprobe btusb 2>/dev/null || true
+fi
 
 # The distro MPD runs as a system service without a PipeWire session; we use per-user instances.
 systemctl disable --now mpd.service mpd.socket >/dev/null 2>&1 || true
@@ -116,6 +127,11 @@ while [ "$i" -lt "$players" ]; do
   as_user systemctl --user enable --now "hisosed-mpd@$i.service"
   i=$((i + 1))
 done
+# A re-run with fewer players must not leave the old extra ones running.
+while [ "$i" -lt 4 ]; do
+  as_user systemctl --user disable --now "hisosed-mpd@$i.service" >/dev/null 2>&1 || true
+  i=$((i + 1))
+done
 
 if [ "$mode" = bluetooth ]; then
   echo "==> Configuring Bluetooth"
@@ -128,22 +144,31 @@ if [ "$mode" = bluetooth ]; then
   cat > /usr/local/bin/hisosed-bt-pair <<'EOF'
 #!/usr/bin/env sh
 # Pair, trust and connect one Bluetooth speaker; its address is kept for auto-reconnect.
+#   hisosed-bt-pair            scan and ask for the address
+#   hisosed-bt-pair XX:...:XX  pair that address without questions (used by host-setup.sh)
 set -eu
 bluetoothctl power on >/dev/null
-echo "Put the speaker into pairing mode. Scanning for 20 seconds..."
-bluetoothctl --timeout 20 scan on >/dev/null 2>&1 || true
-bluetoothctl devices
-printf "Speaker address (XX:XX:XX:XX:XX:XX): "
-read -r mac
-case "$mac" in
-  [0-9A-Fa-f][0-9A-Fa-f]:*) ;;
-  *) echo "Invalid address" >&2; exit 1 ;;
-esac
+mac="${1:-}"
+if [ -z "$mac" ]; then
+  hisosed-bt-scan
+  printf "Speaker address (XX:XX:XX:XX:XX:XX): "
+  read -r mac
+fi
+echo "$mac" | grep -Eq '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$' || { echo "Invalid address" >&2; exit 1; }
 bluetoothctl pair "$mac" || true
 bluetoothctl trust "$mac"
-bluetoothctl connect "$mac"
 echo "$mac" > /etc/hisosed/bt-mac
-echo "Paired. HiSosed will reconnect this speaker automatically."
+# A speaker often needs a few seconds after pairing; the reconnect timer finishes the job.
+bluetoothctl connect "$mac" || echo "Not connected yet; it will be retried every 30 seconds."
+echo "Paired. The speaker will be reconnected automatically."
+EOF
+  cat > /usr/local/bin/hisosed-bt-scan <<'EOF'
+#!/usr/bin/env sh
+# Scan for 20 seconds and print "MAC name" lines of every device seen.
+bluetoothctl power on >/dev/null 2>&1 || true
+echo "Put the speaker into pairing mode. Scanning for 20 seconds..." >&2
+bluetoothctl --timeout 20 scan on >/dev/null 2>&1 || true
+bluetoothctl devices | sed -n 's/^Device //p'
 EOF
   cat > /usr/local/bin/hisosed-bt-reconnect <<'EOF'
 #!/usr/bin/env sh
@@ -153,7 +178,7 @@ mac="$(cat /etc/hisosed/bt-mac)"
 bluetoothctl info "$mac" 2>/dev/null | grep -q "Connected: yes" && exit 0
 bluetoothctl connect "$mac" >/dev/null 2>&1 || true
 EOF
-  chmod 0755 /usr/local/bin/hisosed-bt-pair /usr/local/bin/hisosed-bt-reconnect
+  chmod 0755 /usr/local/bin/hisosed-bt-pair /usr/local/bin/hisosed-bt-scan /usr/local/bin/hisosed-bt-reconnect
   cat > /etc/systemd/system/hisosed-bt-reconnect.service <<'EOF'
 [Unit]
 Description=Reconnect the HiSosed Bluetooth speaker
@@ -178,18 +203,85 @@ EOF
   systemctl enable --now hisosed-bt-reconnect.timer
 fi
 
-address="$(hostname -I 2>/dev/null | awk '{print $1}')"
-echo
-echo "Done. In Home Assistant add the 'Music Player Daemon (MPD)' integration for each player:"
-i=0
-while [ "$i" -lt "$players" ]; do
-  echo "  host ${address:-<this machine IP>}  port $((6600 + i))"
-  i=$((i + 1))
+if [ "$mode" = jack ]; then
+  echo "==> Unmuting the sound card"
+  # Proxmox hosts have no alsa-utils, so the codec comes up muted after every host boot.
+  cat > /usr/local/bin/hisosed-unmute <<'EOF'
+#!/usr/bin/env sh
+for card in $(sed -n 's/^ *\([0-9][0-9]*\) \[.*/\1/p' /proc/asound/cards); do
+  amixer -q -c "$card" sset 'Auto-Mute Mode' Disabled 2>/dev/null || true
+  for control in Master Headphone Speaker Front 'Line Out' PCM; do
+    amixer -q -c "$card" sset "$control" 90% unmute 2>/dev/null || true
+  done
 done
-if [ "$mode" = bluetooth ]; then
-  echo "Next: run 'sudo hisosed-bt-pair' with the speaker in pairing mode."
-else
-  echo "Check the output: runuser -u $user -- env XDG_RUNTIME_DIR=/run/user/$uid pactl list short sinks"
-  echo "Pick another one with:  ... pactl set-default-sink <name>"
+EOF
+  chmod 0755 /usr/local/bin/hisosed-unmute
+  cat > /etc/systemd/system/hisosed-unmute.service <<'EOF'
+[Unit]
+Description=Unmute the sound card for HiSosed
+After=sound.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/hisosed-unmute
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable hisosed-unmute.service >/dev/null
+  /usr/local/bin/hisosed-unmute
+
+  # HDA cards also expose HDMI outputs; prefer the analog one (3.5 mm / line out).
+  sink=""
+  n=0
+  while [ "$n" -lt 15 ]; do
+    sink="$(as_user pactl list short sinks 2>/dev/null | awk '{print $2}' | grep -i analog | head -n 1 || true)"
+    [ -n "$sink" ] && break
+    sleep 1
+    n=$((n + 1))
+  done
+  if [ -n "$sink" ]; then
+    as_user pactl set-default-sink "$sink" || echo "WARNING: could not select $sink" >&2
+  else
+    echo "WARNING: no analog output found. Check: aplay -l" >&2
+  fi
 fi
-echo "Then in HiSosed → Speakers press 'Test signal'."
+
+{
+  echo '#!/usr/bin/env sh'
+  echo "# Show what the HiSosed audio node sees and play a test sound on the default output."
+  echo "user=\"$user\""
+  cat <<'EOF'
+uid="$(id -u "$user")"
+as_user() {
+  runuser -u "$user" -- env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" "$@"
+}
+echo "== Sound cards"
+cat /proc/asound/cards 2>/dev/null || echo "none"
+echo "== Outputs (* = used by HiSosed)"
+default="$(as_user pactl get-default-sink 2>/dev/null || true)"
+as_user pactl list short sinks 2>/dev/null | awk -v d="$default" '{ print ($2 == d ? "* " : "  ") $2 }'
+echo "== Players"
+as_user systemctl --user --no-legend list-units 'hisosed-mpd@*' 2>/dev/null
+if [ -s /etc/hisosed/bt-mac ]; then
+  echo "== Bluetooth speaker"
+  bluetoothctl info "$(cat /etc/hisosed/bt-mac)" | grep -E 'Name|Connected'
+fi
+echo "== Test sound"
+if as_user paplay /usr/share/sounds/alsa/Front_Center.wav; then
+  echo "Played. You should have heard \"Front center\"."
+else
+  echo "Could not play the test sound."
+fi
+EOF
+} > /usr/local/bin/hisosed-check
+chmod 0755 /usr/local/bin/hisosed-check
+
+address="$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+(\.[0-9]+){3}$' | head -n 1 || true)"
+echo
+echo "Audio node is ready: ${address:-<this machine IP>}, players on ports 6600..$((6600 + players - 1))."
+echo "In Home Assistant open HiSosed -> Speakers -> Connect and enter this address."
+if [ "$mode" = bluetooth ] && [ ! -s /etc/hisosed/bt-mac ]; then
+  echo "Pair the speaker: hisosed-bt-pair"
+fi

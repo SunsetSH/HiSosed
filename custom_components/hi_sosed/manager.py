@@ -209,6 +209,10 @@ class ScenarioManager:
         """Return one scenario."""
         return self._scenarios.get(scenario_id)
 
+    def output(self, entity_id: str) -> OutputProfile | None:
+        """Return the profile of one speaker."""
+        return self._outputs.get(entity_id)
+
     def status(self, scenario_id: str) -> tuple[str, datetime | None]:
         """Return the aggregated state and the next window boundary for entities."""
         upcoming = [rt.next_event for rt in self._scenario_runtimes(scenario_id) if rt.state == "waiting" and rt.next_event]

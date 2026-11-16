@@ -58,3 +58,13 @@ ALLOWED_AUDIO_SUFFIXES: Final = frozenset({".aac", ".flac", ".m4a", ".mp3", ".og
 # A blocking play_media must not hold a target forever; a stuck player only skips cells.
 PLAY_TIMEOUT_SECONDS: Final = 10
 TICK_SECONDS: Final = 10
+
+# Audio node onboarding (ADR-0004): players created by scripts/proxmox/audio-node.sh.
+MPD_DOMAIN: Final = "mpd"
+NODE_BASE_PORT: Final = 6600
+NODE_MAX_PLAYERS: Final = 4
+NODE_ENTITY_WAIT_SECONDS: Final = 15
+NODE_KINDS: Final[dict[str, dict[str, int]]] = {
+    "jack": {"warmup_seconds": 0, "keepalive_seconds": 0, "lead_ms": 0},
+    "bluetooth": {"warmup_seconds": 10, "keepalive_seconds": 60, "lead_ms": 250},
+}

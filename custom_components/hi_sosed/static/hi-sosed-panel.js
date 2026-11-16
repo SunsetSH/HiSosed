@@ -222,8 +222,32 @@ const STRINGS = {
   ps_unavailable: ["недоступна", "unavailable"],
   ps_unknown: ["неизвестно", "unknown"],
   guide_title: ["Как подключить колонку, если Home Assistant стоит в Proxmox", "Connecting a speaker when Home Assistant runs in Proxmox"],
+  node_title: ["Подключить колонку к серверу", "Connect a speaker to the server"],
+  node_hint: ["Колонка или усилитель подключены прямо к серверу Proxmox, проводом или по Bluetooth? HiSosed подготовит всё сам. От вас нужно один раз выполнить команду в Proxmox и вписать сюда адрес, который она покажет.", "Is the speaker or amp plugged straight into the Proxmox server, by cable or over Bluetooth? HiSosed will set everything up. You run one command in Proxmox and type in the address it shows."],
+  node_kind: ["Как подключена колонка", "How the speaker is connected"],
+  node_kind_jack: ["Проводом (3.5 мм или USB-карта)", "By cable (3.5 mm or USB card)"],
+  node_kind_bluetooth: ["По Bluetooth", "Over Bluetooth"],
+  node_players: ["Сколько звуков одновременно", "Sounds at the same time"],
+  node_step1: ["Выполните команду в Proxmox", "Run the command in Proxmox"],
+  node_step1_jack: ["Откройте Proxmox в браузере, слева выберите сервер (обычно он называется pve), затем Shell. Вставьте команду и нажмите Enter. Через 2–5 минут она напишет адрес. Команда создаст маленький контейнер и отдаст ему звуковую карту сервера.", "Open Proxmox in the browser, pick the server on the left (usually called pve), then Shell. Paste the command and press Enter. In 2–5 minutes it prints an address. The command creates a small container and gives it the server's sound card."],
+  node_step1_bluetooth: ["Откройте Proxmox в браузере, слева выберите сервер (обычно он называется pve), затем Shell. Вставьте команду и нажмите Enter. Она создаст маленькую виртуальную машину и отдаст ей Bluetooth-адаптер сервера. Это займёт 5–10 минут. Потом она попросит перевести колонку в режим сопряжения и выбрать её номер в списке. В конце покажет адрес.", "Open Proxmox in the browser, pick the server on the left (usually called pve), then Shell. Paste the command and press Enter. It creates a small virtual machine and gives it the server's Bluetooth adapter, which takes 5–10 minutes. Then it asks you to put the speaker into pairing mode and pick its number from a list. At the end it shows an address."],
+  node_step2: ["Впишите адрес, который показала команда", "Type in the address the command showed"],
+  node_connect: ["Подключить", "Connect"],
+  node_connecting: ["Подключаю…", "Connecting…"],
+  node_host_needed: ["Сначала впишите адрес", "Type in the address first"],
+  node_added: ["подключена", "connected"],
+  node_exists: ["уже была подключена", "was already connected"],
+  node_cannot_connect: ["не отвечает", "doesn't answer"],
+  node_unavailable: ["Home Assistant не смог загрузить интеграцию MPD", "Home Assistant couldn't load the MPD integration"],
+  node_port: ["Плеер на порту {p}", "Player on port {p}"],
+  node_done: ["Готово. Нажмите «Проверить звук» у новой колонки ниже.", "Done. Press “Test sound” on the new speaker below."],
+  node_failed: ["Не получилось. Проверьте адрес и что команда в Proxmox закончилась словом «Готово». Если адрес верный, подождите минуту и нажмите «Подключить» ещё раз.", "That didn't work. Check the address and that the Proxmox command ended with “Done”. If the address is right, wait a minute and press Connect again."],
+  node_no_url: ["Home Assistant не знает свой адрес в домашней сети, и колонка не сможет скачать звуки. Укажите его в Настройки → Система → Сеть → «Локальная сеть», например http://192.168.1.10:8123.", "Home Assistant doesn't know its own address on the home network, so the speaker can't download sounds. Set it in Settings → System → Network → “Local network”, e.g. http://192.168.1.10:8123."],
+  node_no_audio_device: ["В настройках виртуальной машины Home Assistant ничего добавлять не нужно, в том числе Audio Device. Это виртуальная звуковая карта, и к гнезду сервера она не ведёт.", "Don't add anything to the Home Assistant VM, including an Audio Device. That's a virtual sound card and doesn't lead to the server's jack."],
+  trouble_title: ["Если что-то не получается", "If something doesn't work"],
   copy: ["Скопировать", "Copy"],
   copied: ["Скопировано", "Copied"],
+  copy_failed: ["Не получилось скопировать, выделите текст и скопируйте вручную", "Couldn't copy; select the text and copy it yourself"],
   err_generic: ["Что-то пошло не так ({c})", "Something went wrong ({c})"],
   sent_to_speaker: ["Отправлено на колонку", "Sent to the speaker"],
   no_test_target: ["Сначала выберите колонку", "Choose a speaker first"],
@@ -283,6 +307,7 @@ const ERRORS = {
   integration_not_ready: ["HiSosed ещё запускается, попробуйте через пару секунд", "HiSosed is still starting, try again in a moment"],
   unauthorized: ["Это может делать только администратор", "Only an administrator can do this"],
   network_error: ["Нет связи с Home Assistant", "Can't reach Home Assistant"],
+  invalid_host: ["Это не похоже на адрес. Нужен адрес вида 192.168.1.50, без http:// и без порта", "That doesn't look like an address. Use something like 192.168.1.50, without http:// or a port"],
 };
 
 const DENSITY_PRESETS = [["dens_rare", 10], ["dens_some", 25], ["dens_mid", 40], ["dens_often", 70], ["dens_all", 100]];
@@ -298,6 +323,7 @@ const RECOMMENDED = {
   other: { warmup_seconds: 0, keepalive_seconds: 0, lead_ms: 0 },
 };
 
+const REPO_RAW = "https://raw.githubusercontent.com/SunsetSH/HiSosed/main";
 const escapeHtml = (value) => String(value ?? "")
   .replaceAll("&", "&amp;")
   .replaceAll("<", "&lt;")
@@ -449,11 +475,16 @@ progress { width:100%; height:8px; accent-color:var(--hs-accent); }
 .speaker-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .speaker-head ha-icon { color:var(--hs-accent); }
 pre { background:var(--hs-soft); padding:10px 12px; border-radius:8px; overflow-x:auto; font-size:12.5px; margin:6px 0 0; white-space:pre; }
-.code { position:relative; }
-.code button { position:absolute; top:6px; right:6px; }
+.code { display:grid; gap:6px; margin:6px 0; }
+.code pre { margin:0; white-space:pre-wrap; word-break:break-all; }
+.code button { justify-self:end; }
 .guide ol { padding-left:20px; line-height:1.55; } .guide li { margin:6px 0; }
 .guide details { border:1px solid var(--hs-line); border-radius:10px; padding:10px 14px; margin-top:10px; }
 .guide summary { cursor:pointer; font-weight:500; }
+details.node > summary h2 { vertical-align:middle; }
+details.node[open] > summary { margin-bottom:4px; }
+.node-result { list-style:none; padding:0; margin:10px 0 6px; display:grid; gap:4px; }
+.node-result li { display:flex; gap:6px; align-items:center; margin:0; }
 .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--primary-text-color); color:var(--hs-card); padding:10px 16px; border-radius:10px; z-index:20; max-width:90vw; box-shadow:0 4px 16px rgba(0,0,0,.3); }
 .toast.err { background:var(--hs-err); color:#fff; }
 .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:30; display:flex; align-items:center; justify-content:center; padding:16px; }
@@ -499,6 +530,7 @@ class HiSosedPanel extends HTMLElement {
     this._libFilter = "";
     this._libSearch = "";
     this._outputTimers = {};
+    this._node = { kind: "jack", players: 2, host: "", busy: false, result: null };
     this._saveState = "saved";
     this._details = new Map();
   }
@@ -1367,8 +1399,52 @@ class HiSosedPanel extends HTMLElement {
     const players = this._players;
     return `
       <div class="card"><h2><ha-icon icon="mdi:speaker-wireless"></ha-icon>${this.t("tab_speakers")}</h2><p class="hint">${this.t("speakers_hint")}</p></div>
+      ${this._nodeHtml(!Object.values(this._outputs || {}).some((o) => o.kind === "jack" || o.kind === "bluetooth"))}
       ${players.length ? players.map((state) => this._speakerHtml(state)).join("") : `<div class="card"><p class="hint">${this.t("no_players")}</p></div>`}
       ${this._guideHtml()}`;
+  }
+
+  // Audio node onboarding (ADR-0004): one command on the Proxmox host, then the address here.
+  _nodeHtml(open) {
+    const node = this._node;
+    const command = `wget -qO- ${REPO_RAW}/scripts/proxmox/host-setup.sh | sh -s -- --mode ${node.kind} --players ${node.players}`;
+    const result = node.result;
+    let resultHtml = "";
+    if (result) {
+      const ok = result.players.some((p) => p.entity_id);
+      resultHtml = `<ul class="node-result">${result.players.map((p) => `<li><ha-icon icon="${p.entity_id ? "mdi:check-circle-outline" : "mdi:alert-circle-outline"}"></ha-icon>${escapeHtml(p.entity_id ? this._playerName(p.entity_id) : this.t("node_port", { p: p.port }))}: ${this.t(`node_${p.status}`)}</li>`).join("")}</ul>
+        <p class="hint" style="margin:0">${this.t(ok ? "node_done" : "node_failed")}</p>
+        ${result.local_url ? "" : `<div class="banner warn">${this.t("node_no_url")}</div>`}`;
+    }
+    return `<details class="card guide node" data-key="node" ${this._open("node", open)}>
+      <summary><h2 style="display:inline-flex;margin:0"><ha-icon icon="mdi:server-plus"></ha-icon>${this.t("node_title")}</h2></summary>
+      <p class="hint">${this.t("node_hint")}</p>
+      <div class="fields">
+        <label class="field">${this.t("node_kind")}<select data-node="kind">${["jack", "bluetooth"].map((k) => `<option value="${k}" ${node.kind === k ? "selected" : ""}>${this.t(`node_kind_${k}`)}</option>`).join("")}</select></label>
+        <label class="field">${this.t("node_players")}<select data-node="players">${[1, 2, 3, 4].map((n) => `<option value="${n}" ${node.players === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+      </div>
+      <ol>
+        <li><b style="font-weight:500">${this.t("node_step1")}.</b> ${this.t(`node_step1_${node.kind}`)}${this._code(command)}</li>
+        <li><b style="font-weight:500">${this.t("node_step2")}:</b>
+          <div class="row" style="margin-top:6px"><input type="text" class="grow" data-node="host" inputmode="decimal" autocomplete="off" placeholder="192.168.1.50" value="${escapeHtml(node.host)}" aria-label="${this.t("node_step2")}">
+          <button class="btn" data-action="node-connect" ${node.busy ? "disabled" : ""}><ha-icon icon="mdi:lan-connect"></ha-icon>${this.t(node.busy ? "node_connecting" : "node_connect")}</button></div>
+          ${resultHtml}</li>
+      </ol>
+      <p class="hint" style="margin:0">${this.t("node_no_audio_device")}</p>
+    </details>`;
+  }
+
+  async _connectNode() {
+    const node = this._node;
+    if (!node.host.trim()) { this._toast(this.t("node_host_needed"), true); return; }
+    node.busy = true;
+    node.result = null;
+    this._render();
+    const name = node.kind === "bluetooth" ? "HiSosed Bluetooth" : "HiSosed";
+    const result = await this._call("hi_sosed/node/connect", { host: node.host.trim(), players: node.players, kind: node.kind, name });
+    node.busy = false;
+    if (result && result !== true) node.result = result;
+    this._render();
   }
 
   _speakerHtml(state) {
@@ -1406,46 +1482,31 @@ class HiSosedPanel extends HTMLElement {
 
   _guideHtml() {
     const ru = this._ru;
-    const lxc = "lxc.cgroup2.devices.allow: c 116:* rwm\nlxc.mount.entry: /dev/snd dev/snd none bind,optional,create=dir";
-    const node = "wget -qO- https://raw.githubusercontent.com/SunsetSH/HiSosed/main/scripts/proxmox/audio-node.sh | sudo sh -s -- --mode jack --players 2";
-    const nodeBt = "wget -qO- https://raw.githubusercontent.com/SunsetSH/HiSosed/main/scripts/proxmox/audio-node.sh | sudo sh -s -- --mode bluetooth --players 2\n# " + (ru ? "потом сопряжение:" : "then pair:") + "\nsudo hisosed-bt-pair";
-    const usb = ru
-      ? "Proxmox → ВМ с Home Assistant → Hardware → Add → USB Device → Use USB Vendor/Device ID → выберите звуковую карту и перезапустите ВМ."
-      : "Proxmox → Home Assistant VM → Hardware → Add → USB Device → Use USB Vendor/Device ID → pick the sound card and restart the VM.";
+    const check = (mode) => `wget -qO- ${REPO_RAW}/scripts/proxmox/host-setup.sh | sh -s -- --mode ${mode} --check`;
+    const pair = `wget -qO- ${REPO_RAW}/scripts/proxmox/host-setup.sh | sh -s -- --mode bluetooth --pair`;
+    const item = (key, title, body) => `<details data-key="${key}" ${this._open(key, false)}><summary>${title}</summary>${body}</details>`;
     return `<div class="card guide">
-      <h2><ha-icon icon="mdi:server-network"></ha-icon>${this.t("guide_title")}</h2>
-      <p class="hint">${ru
-        ? "Home Assistant OS внутри виртуальной машины Proxmox не видит ни звуковую карту, ни Bluetooth сервера. Звук нужно довести до колонки отдельно, и чтобы она при этом появилась в Home Assistant как плеер. Ниже три рабочих способа, выберите подходящий."
-        : "Home Assistant OS inside a Proxmox VM can't see the server's sound card or Bluetooth. The sound has to reach the speaker some other way, and the speaker has to show up in Home Assistant as a player. Here are three ways that work."}</p>
-      <details data-key="g-usb" ${this._open("g-usb", true)}><summary>${ru ? "Колонка на проводе, способ 1 (самый простой): USB-звуковая карта" : "Wired speaker, option 1 (simplest): a USB sound card"}</summary>
-        <ol>
-          <li>${ru ? "Возьмите любую USB-звуковую карту с выходом 3.5 мм, которая работает без драйверов, и воткните её в сервер." : "Get any driverless USB sound card with a 3.5 mm output and plug it into the server."}</li>
-          <li>${escapeHtml(usb)}</li>
-          <li>${ru ? "В Home Assistant откройте Настройки → Система → Оборудование: карта должна быть там. Выход по умолчанию выбирается в Настройки → Система → Аудио (или в терминале: <code>ha audio info</code> и <code>ha audio default output --name …</code>)." : "In Home Assistant, Settings → System → Hardware should list the card. Pick the default output under Settings → System → Audio (or in the terminal: <code>ha audio info</code> and <code>ha audio default output --name …</code>)."}</li>
-          <li>${ru ? "Поставьте из официального магазина дополнение <b>VLC</b> и запустите его. Home Assistant сам предложит интеграцию <b>VLC media player via Telnet</b>, согласитесь, и появится плеер." : "Install the official <b>VLC</b> add-on and start it. Home Assistant will offer the <b>VLC media player via Telnet</b> integration; accept it and a player appears."}</li>
-          <li>${ru ? "Вернитесь сюда, выберите для неё «Провод» и нажмите «Проверить звук»." : "Come back here, set it to “Cable” and press “Test sound”."}</li>
-        </ol>
-      </details>
-      <details data-key="g-lxc" ${this._open("g-lxc", false)}><summary>${ru ? "Колонка на проводе, способ 2: встроенный звук сервера через LXC" : "Wired speaker, option 2: the server's onboard audio via LXC"}</summary>
-        <ol>
-          <li>${ru ? "Создайте в Proxmox контейнер LXC с Debian 12. На хосте допишите в <code>/etc/pve/lxc/&lt;ID&gt;.conf</code>:" : "Create a Debian 12 LXC container. On the host, add to <code>/etc/pve/lxc/&lt;ID&gt;.conf</code>:"}${this._code(lxc)}</li>
-          <li>${ru ? "Перезапустите контейнер и запустите внутри установщик аудиоузла. Он поставит MPD и PipeWire и сделает два плеера, чтобы дорожки могли звучать одновременно:" : "Restart the container and run the audio-node installer inside. It sets up MPD and PipeWire with two players so layers can play at the same time:"}${this._code(node)}</li>
-          <li>${ru ? "В Home Assistant добавьте интеграцию <b>Music Player Daemon (MPD)</b> на каждый порт, который покажет скрипт (6600, 6601…). Хост — IP контейнера." : "In Home Assistant, add the <b>Music Player Daemon (MPD)</b> integration for each port the script prints (6600, 6601…). The host is the container's IP."}</li>
-        </ol>
-      </details>
-      <details data-key="g-bt" ${this._open("g-bt", false)}><summary>${ru ? "Bluetooth-колонка" : "Bluetooth speaker"}</summary>
-        <ol>
-          <li>${ru ? "Для Bluetooth лучше всего завести отдельную маленькую ВМ с Debian 12 (хватит одного ядра и 512 МБ). Контейнер LXC не подойдёт: Bluetooth в него не пробросить." : "Bluetooth works best in a small separate Debian 12 VM (one core and 512 MB are plenty). An LXC container won't do: Bluetooth can't be passed into it."}</li>
-          <li>${ru ? "Пробросьте в эту ВМ USB Bluetooth-адаптер (Hardware → Add → USB Device). Встроенный адаптер тоже можно, если Home Assistant им не пользуется." : "Pass a USB Bluetooth adapter to that VM (Hardware → Add → USB Device). A built-in adapter works too if Home Assistant isn't using it."}</li>
-          <li>${ru ? "В ВМ запустите установщик и выполните сопряжение, переведя колонку в режим сопряжения:" : "Inside the VM run the installer, put the speaker in pairing mode and pair:"}${this._code(nodeBt)}</li>
-          <li>${ru ? "Скрипт сам переподключает колонку, если она отвалилась. В Home Assistant добавьте MPD на порты 6600 и 6601, а здесь выберите «Bluetooth» и нажмите «Подобрать настройки». Тогда колонка будет просыпаться заранее и не станет съедать начало звуков." : "The script reconnects the speaker on its own if it drops. Add MPD on ports 6600 and 6601 in Home Assistant, then pick “Bluetooth” here and press “Suggest settings”. The speaker will wake up early and stop eating the start of sounds."}</li>
-        </ol>
-      </details>
-      <details data-key="g-mix" ${this._open("g-mix", false)}><summary>${ru ? "Чтобы дорожки звучали одновременно" : "Playing layers at the same time"}</summary>
-        <p>${ru
-          ? "Один плеер за раз играет один звук: новый просто обрывает предыдущий. Поэтому установщик аудиоузла делает несколько плееров MPD на одной колонке, а PipeWire их смешивает. Дайте дорожкам разные плееры («Где играет» → «На своих колонках»). Если плеер всего один, второстепенной дорожке в «Тонкой настройке» выберите «Не мешать»."
-          : "A player plays one sound at a time; a new one just cuts off the last. That's why the audio-node installer creates several MPD players on one speaker and PipeWire mixes them. Give the layers different players (“Where it plays” → “On its own speakers”). With only one player, set the secondary layer to “Don't interrupt” under “Fine-tuning”."}</p>
-      </details>
+      <h2><ha-icon icon="mdi:lifebuoy"></ha-icon>${this.t("trouble_title")}</h2>
+      ${item("g-silent", ru ? "Проверка проходит, но звука нет" : "The test passes but there's no sound", ru
+        ? `<ol>
+            <li>Кабель должен идти из зелёного гнезда на задней стенке сервера (линейный выход) в линейный вход усилителя, например AUX или CD. На усилителе выберите этот вход и прибавьте громкость.</li>
+            <li>Выполните в Proxmox команду ниже. Она покажет, какие звуковые карты и выходы видит узел, и проиграет фразу «Front center». Выход, которым пользуется HiSosed, отмечен звёздочкой.${this._code(check("jack"))}</li>
+            <li>Если звёздочка стоит не у того выхода (например, у HDMI), напишите в issue проекта, что показала проверка.</li>
+          </ol>`
+        : `<ol>
+            <li>The cable should go from the green jack on the back of the server (line out) to a line input on the amp, such as AUX or CD. Select that input on the amp and turn the volume up.</li>
+            <li>Run the command below in Proxmox. It shows which sound cards and outputs the node sees and plays the words “Front center”. The output HiSosed uses is marked with an asterisk.${this._code(check("jack"))}</li>
+            <li>If the asterisk is on the wrong output (HDMI, say), open an issue with what the check printed.</li>
+          </ol>`)}
+      ${item("g-bt", ru ? "Bluetooth-колонка не играет или отваливается" : "The Bluetooth speaker doesn't play or keeps dropping", ru
+        ? `<p>Узел сам переподключает колонку каждые 30 секунд. Если колонку сбросили или нужна другая, переподключите её этой командой в Proxmox:${this._code(pair)}Проверка, как и для провода, делается так:${this._code(check("bluetooth"))}</p><p>У колонки в списке ниже нажмите «Подобрать настройки», тогда она будет просыпаться заранее и не станет съедать начало звуков.</p>`
+        : `<p>The node reconnects the speaker every 30 seconds on its own. If the speaker was reset or you want another one, pair again with this command in Proxmox:${this._code(pair)}The check works the same as for cable:${this._code(check("bluetooth"))}</p><p>Press “Suggest settings” on the speaker below so it wakes up early and doesn't eat the start of sounds.</p>`)}
+      ${item("g-mix", ru ? "Чтобы дорожки звучали одновременно" : "Playing layers at the same time", `<p>${ru
+        ? "Один плеер за раз играет один звук: новый просто обрывает предыдущий. Поэтому на одной колонке создаётся несколько плееров (их число вы выбирали выше), а звук смешивается. Дайте дорожкам разные плееры («Где играет» → «На своих колонках»). Если плеер всего один, второстепенной дорожке в «Тонкой настройке» выберите «Не мешать»."
+        : "A player plays one sound at a time; a new one just cuts off the last. That's why one speaker gets several players (you picked how many above) and the sound is mixed. Give the layers different players (“Where it plays” → “On its own speakers”). With only one player, set the secondary layer to “Don't interrupt” under “Fine-tuning”."}</p>`)}
+      ${item("g-manual", ru ? "Подключить плеер вручную" : "Adding a player by hand", `<p>${ru
+        ? "Если кнопка «Подключить» не справилась, плеер можно добавить и вручную: Настройки → Устройства и службы → Добавить интеграцию → <b>Music Player Daemon (MPD)</b>. Хост — адрес узла, порт 6600 для первого плеера, 6601 для второго и так далее. Пароль не нужен. Плеер появится здесь сам."
+        : "If Connect didn't manage, add the player yourself: Settings → Devices & services → Add integration → <b>Music Player Daemon (MPD)</b>. Host is the node's address, port 6600 for the first player, 6601 for the second and so on. No password. The player shows up here on its own."}</p>`)}
     </div>`;
   }
 
@@ -1479,6 +1540,23 @@ class HiSosedPanel extends HTMLElement {
   }
 
   // ------------------------------------------------------------------ dialogs & toast
+
+  // navigator.clipboard needs HTTPS; Home Assistant on a LAN is usually plain HTTP.
+  async _copy(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
+    } catch { /* fall through to the legacy path */ }
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    this.shadowRoot.append(area);
+    area.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch { ok = false; }
+    area.remove();
+    return ok;
+  }
 
   _toast(text, error = false) {
     const overlay = this.shadowRoot.querySelector("#overlay");
@@ -1627,6 +1705,7 @@ class HiSosedPanel extends HTMLElement {
       return;
     }
     if (el.dataset.outField) { this._onOutputField(el, false); return; }
+    if (el.dataset.node === "host") { this._node.host = el.value; return; }
     if (!el.dataset.bind || !this._draft || el.type === "checkbox" || el.type === "radio") return;
     setPath(this._draft, el.dataset.bind, this._coerce(el));
     if (el.dataset.outTarget) {
@@ -1652,6 +1731,12 @@ class HiSosedPanel extends HTMLElement {
   async _onChange(event) {
     const el = event.target;
     if (el.dataset.outField) { this._onOutputField(el, true); return; }
+    if (el.dataset.node === "kind" || el.dataset.node === "players") {
+      this._node[el.dataset.node] = el.dataset.node === "players" ? Number(el.value) : el.value;
+      this._node.result = null;
+      this._render();
+      return;
+    }
     const action = el.dataset.actionChange;
     if (action === "upload-category") {
       if (el.value === "__new__") { this._uploadCategory = (await this._prompt(this.t("category_prompt"))) || this._uploadCategory; this._render(); }
@@ -1833,7 +1918,8 @@ class HiSosedPanel extends HTMLElement {
         this._render();
         break;
       }
-      case "copy": try { await navigator.clipboard.writeText(el.dataset.text); this._toast(this.t("copied")); } catch { this._toast(el.dataset.text); } break;
+      case "copy": this._toast(this.t(await this._copy(el.dataset.text) ? "copied" : "copy_failed"), false); break;
+      case "node-connect": await this._connectNode(); break;
       default: break;
     }
   }
