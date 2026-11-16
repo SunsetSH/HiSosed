@@ -4,11 +4,159 @@
     "step": {
       "user": {
         "title": "Настройка HiSosed",
-        "description": "Создать локальный планировщик HiSosed. Сценарии настраиваются в панели HiSosed в боковом меню."
+        "description": "Создать локальный планировщик HiSosed. Программы, звуки и колонки настраиваются в панели HiSosed в боковом меню."
       }
     },
     "abort": {
-      "single_instance_allowed": "Разрешен только один экземпляр HiSosed."
+      "single_instance_allowed": "Разрешён только один экземпляр HiSosed.",
+      "already_configured": "HiSosed уже настроен."
+    }
+  },
+  "entity": {
+    "switch": {
+      "schedule": {
+        "name": "Расписание"
+      }
+    },
+    "select": {
+      "preset": {
+        "name": "Пресет"
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Состояние",
+        "state": {
+          "disabled": "Выключено",
+          "idle": "Не настроено",
+          "waiting": "Ждёт окна",
+          "running": "Играет",
+          "snoozed": "Тишина",
+          "error": "Ошибка плеера"
+        },
+        "state_attributes": {
+          "next_window": {
+            "name": "Следующее окно"
+          },
+          "manual_until": {
+            "name": "Ручной запуск до"
+          }
+        }
+      }
+    }
+  },
+  "services": {
+    "start": {
+      "name": "Включить расписание",
+      "description": "Включает программу; звук играет только во временных окнах.",
+      "fields": {
+        "scenario_id": {
+          "name": "Программа",
+          "description": "ID или точное имя программы."
+        }
+      }
+    },
+    "stop": {
+      "name": "Остановить",
+      "description": "Немедленно останавливает программу и выключает её расписание.",
+      "fields": {
+        "scenario_id": {
+          "name": "Программа",
+          "description": "ID или точное имя программы."
+        }
+      }
+    },
+    "run_now": {
+      "name": "Запустить сейчас",
+      "description": "Играет сейчас указанное число минут, независимо от расписания.",
+      "fields": {
+        "scenario_id": {
+          "name": "Программа",
+          "description": "ID или точное имя программы."
+        },
+        "minutes": {
+          "name": "Минуты",
+          "description": "Длительность ручного запуска."
+        }
+      }
+    },
+    "regenerate": {
+      "name": "Новая сетка",
+      "description": "Заменяет будущие клетки текущего цикла.",
+      "fields": {
+        "scenario_id": {
+          "name": "Программа",
+          "description": "ID или точное имя программы."
+        },
+        "layer": {
+          "name": "Дорожка",
+          "description": "ID или имя дорожки; пусто — все."
+        }
+      }
+    },
+    "apply_preset": {
+      "name": "Применить пресет",
+      "description": "Переключает дорожки, звуки, плотность и громкость на сохранённый пресет.",
+      "fields": {
+        "scenario_id": {
+          "name": "Программа",
+          "description": "ID или точное имя программы."
+        },
+        "preset": {
+          "name": "Пресет",
+          "description": "ID или имя пресета."
+        }
+      }
+    },
+    "set_layer": {
+      "name": "Включить/выключить дорожку",
+      "description": "Включает или выключает дорожку без удаления.",
+      "fields": {
+        "scenario_id": {
+          "name": "Программа",
+          "description": "ID или точное имя программы."
+        },
+        "layer": {
+          "name": "Дорожка",
+          "description": "ID или имя дорожки."
+        },
+        "enabled": {
+          "name": "Включена",
+          "description": "Новое состояние дорожки."
+        }
+      }
+    },
+    "preview": {
+      "name": "Прослушать звук",
+      "description": "Один раз проигрывает звук из библиотеки.",
+      "fields": {
+        "sound_id": {
+          "name": "Звук",
+          "description": "ID звука из библиотеки."
+        },
+        "entity_id": {
+          "name": "Плееры",
+          "description": "Где играть; по умолчанию — плееры программы."
+        },
+        "scenario_id": {
+          "name": "Программа",
+          "description": "ID или точное имя программы."
+        }
+      }
+    },
+    "snooze": {
+      "name": "Тишина",
+      "description": "Глушит все программы на указанное время. Пропущенные звуки не догоняются.",
+      "fields": {
+        "minutes": {
+          "name": "Минуты",
+          "description": "Длительность тишины."
+        }
+      }
+    },
+    "resume": {
+      "name": "Снять тишину",
+      "description": "Возвращает звук до окончания тишины."
     }
   }
 }

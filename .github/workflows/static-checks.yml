@@ -1,4 +1,4 @@
-name: Static checks
+name: Checks
 
 on:
   push:
@@ -22,5 +22,20 @@ jobs:
           jq empty custom_components/hi_sosed/translations/ru.json
       - name: Check panel JavaScript syntax
         run: node --check custom_components/hi_sosed/static/hi-sosed-panel.js
-      - name: Check shell installer syntax
-        run: sh -n scripts/install.sh
+      - name: Check shell script syntax
+        run: |
+          sh -n scripts/install.sh
+          sh -n scripts/proxmox/audio-node.sh
+
+  tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install Home Assistant test harness
+        run: |
+          pipx install uv
+          uv venv --python 3.13 .venv
+          uv pip install --python .venv/bin/python pytest-homeassistant-custom-component
+      - name: Run pytest
+        run: .venv/bin/python -m pytest

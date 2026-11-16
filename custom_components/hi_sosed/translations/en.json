@@ -4,11 +4,159 @@
     "step": {
       "user": {
         "title": "Set up HiSosed",
-        "description": "Create the local HiSosed scheduler. Scenarios are configured from the HiSosed sidebar panel."
+        "description": "Create the local HiSosed scheduler. Scenarios, sounds and speakers are configured in the HiSosed sidebar panel."
       }
     },
     "abort": {
-      "single_instance_allowed": "Only one HiSosed instance is allowed."
+      "single_instance_allowed": "Only one HiSosed instance is allowed.",
+      "already_configured": "HiSosed is already configured."
+    }
+  },
+  "entity": {
+    "switch": {
+      "schedule": {
+        "name": "Schedule"
+      }
+    },
+    "select": {
+      "preset": {
+        "name": "Preset"
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "disabled": "Disabled",
+          "idle": "Not configured",
+          "waiting": "Waiting",
+          "running": "Running",
+          "snoozed": "Snoozed",
+          "error": "Player error"
+        },
+        "state_attributes": {
+          "next_window": {
+            "name": "Next window"
+          },
+          "manual_until": {
+            "name": "Manual run until"
+          }
+        }
+      }
+    }
+  },
+  "services": {
+    "start": {
+      "name": "Enable schedule",
+      "description": "Enables the scenario; sound plays only inside its time windows.",
+      "fields": {
+        "scenario_id": {
+          "name": "Scenario",
+          "description": "Scenario id or exact name."
+        }
+      }
+    },
+    "stop": {
+      "name": "Stop",
+      "description": "Immediately stops the scenario and disables its schedule.",
+      "fields": {
+        "scenario_id": {
+          "name": "Scenario",
+          "description": "Scenario id or exact name."
+        }
+      }
+    },
+    "run_now": {
+      "name": "Run now",
+      "description": "Plays now for the given minutes regardless of the schedule.",
+      "fields": {
+        "scenario_id": {
+          "name": "Scenario",
+          "description": "Scenario id or exact name."
+        },
+        "minutes": {
+          "name": "Minutes",
+          "description": "Manual run duration."
+        }
+      }
+    },
+    "regenerate": {
+      "name": "Regenerate grid",
+      "description": "Replaces future cells of the current cycle.",
+      "fields": {
+        "scenario_id": {
+          "name": "Scenario",
+          "description": "Scenario id or exact name."
+        },
+        "layer": {
+          "name": "Layer",
+          "description": "Layer id or name; empty means all."
+        }
+      }
+    },
+    "apply_preset": {
+      "name": "Apply preset",
+      "description": "Switches layers, sounds, density and volume to a saved preset.",
+      "fields": {
+        "scenario_id": {
+          "name": "Scenario",
+          "description": "Scenario id or exact name."
+        },
+        "preset": {
+          "name": "Preset",
+          "description": "Preset id or name."
+        }
+      }
+    },
+    "set_layer": {
+      "name": "Toggle layer",
+      "description": "Turns a layer on or off without deleting it.",
+      "fields": {
+        "scenario_id": {
+          "name": "Scenario",
+          "description": "Scenario id or exact name."
+        },
+        "layer": {
+          "name": "Layer",
+          "description": "Layer id or name."
+        },
+        "enabled": {
+          "name": "Enabled",
+          "description": "New layer state."
+        }
+      }
+    },
+    "preview": {
+      "name": "Preview sound",
+      "description": "Plays one library sound once.",
+      "fields": {
+        "sound_id": {
+          "name": "Sound",
+          "description": "Library sound id."
+        },
+        "entity_id": {
+          "name": "Players",
+          "description": "Where to play; defaults to the scenario players."
+        },
+        "scenario_id": {
+          "name": "Scenario",
+          "description": "Scenario id or exact name."
+        }
+      }
+    },
+    "snooze": {
+      "name": "Snooze",
+      "description": "Silences every scenario for a while. Skipped sounds are not replayed.",
+      "fields": {
+        "minutes": {
+          "name": "Minutes",
+          "description": "Snooze duration."
+        }
+      }
+    },
+    "resume": {
+      "name": "Resume",
+      "description": "Ends the snooze early."
     }
   }
 }

@@ -1,9 +1,21 @@
 {
   "domain": "hi_sosed",
   "name": "HiSosed",
+  "after_dependencies": [
+    "media_source"
+  ],
+  "codeowners": [],
   "config_flow": true,
+  "dependencies": [
+    "frontend",
+    "http",
+    "panel_custom",
+    "websocket_api"
+  ],
+  "documentation": "https://github.com/SunsetSH/HiSosed",
   "integration_type": "helper",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/SunsetSH/HiSosed/issues",
   "single_config_entry": true,
-  "iot_class": "Local Push",
-  "version": "0.1.0"
+  "version": "0.2.0"
 }

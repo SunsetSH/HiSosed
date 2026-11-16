@@ -1,6 +1,6 @@
 # ADR-0002: Bluetooth-усилитель подключается через media_player, не напрямую из HiSosed
 
-- Статус: принято для v0.1.0
+- Статус: принято для v0.1.0; рекомендуемая цепочка заменена [ADR-0003](0003-layers-library-presets-outputs.md) и [PROXMOX_AUDIO.md](../PROXMOX_AUDIO.md). Принцип «только через media_player» в силе.
 - Дата: 2026-09-03
 - Связанные требования: HS-FR-036–039, HS-NFR-001–003
 

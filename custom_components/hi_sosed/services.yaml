@@ -10,19 +10,73 @@ stop:
       required: true
       selector:
         text:
+run_now:
+  fields:
+    scenario_id:
+      required: true
+      selector:
+        text:
+    minutes:
+      default: 30
+      selector:
+        number:
+          min: 1
+          max: 1440
+          unit_of_measurement: min
 regenerate:
   fields:
     scenario_id:
       required: true
       selector:
         text:
-preview:
+    layer:
+      selector:
+        text:
+apply_preset:
   fields:
     scenario_id:
       required: true
       selector:
         text:
-    media_content_id:
-      required: false
+    preset:
+      required: true
       selector:
         text:
+set_layer:
+  fields:
+    scenario_id:
+      required: true
+      selector:
+        text:
+    layer:
+      required: true
+      selector:
+        text:
+    enabled:
+      required: true
+      selector:
+        boolean:
+preview:
+  fields:
+    sound_id:
+      required: true
+      selector:
+        text:
+    entity_id:
+      selector:
+        entity:
+          domain: media_player
+          multiple: true
+    scenario_id:
+      selector:
+        text:
+snooze:
+  fields:
+    minutes:
+      default: 30
+      selector:
+        number:
+          min: 1
+          max: 1440
+          unit_of_measurement: min
+resume:

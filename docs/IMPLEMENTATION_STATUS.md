@@ -1,35 +1,36 @@
 # Статус реализации
 
-Дата: 2026-09-03.
+Дата: 2026-11-16, версия 0.2.0 (не выпущена). Решения — [ADR-0003](adr/0003-layers-library-presets-outputs.md).
 
-## Реализовано в рабочем дереве
+## Реализовано
 
-- custom integration `custom_components/hi_sosed` с manifest, config flow и HACS metadata;
-- локальное JSON-хранилище сценариев с ревизиями;
-- чистая логика точной плотности клеточной сетки и weighted random audio;
-- асинхронный scheduler с абсолютными границами клеток и generation token;
-- действия `hi_sosed.start`, `stop`, `regenerate`, `preview`;
-- admin-only WebSocket CRUD API;
-- admin-only import одного локального аудиофайла: whitelist форматов, предел 25 МБ, staging → atomic rename;
-- встроенная side panel для создания сценария, выбора `media_player`, загрузки файлов и отображения текущей сетки;
-- HACS install structure и conservative GitHub-tag installer с резервной копией предыдущего компонента;
-- ADR для USB Bluetooth adapter/A2DP усилителя.
+- программы из 1–20 независимых дорожек: свои сетки, чекбоксы дорожек и звуков, веса, громкость, политика пересечения `replace|skip`;
+- недельное расписание с несколькими интервалами на день (перерывы), переход через полночь, «сутки», склейка окон, DST; своё расписание и свои колонки у дорожки;
+- общая библиотека звуков с категориями: upload из браузера (drag&drop, несколько файлов, прогресс, проверка сигнатуры, квота), сканирование папки (подпапка = категория), ссылка `media-source://`, стартовый набор синтезированных стуков, прослушивание в браузере и на колонке;
+- пресеты микса: сохранить, применить, перезаписать, переименовать; select-сущность;
+- «Запустить сейчас на N минут», глобальная «Тишина на N минут», `stop` с сохранением;
+- профили колонок: тип, громкость, прогрев, keep-alive тишиной, компенсация задержки, тестовый сигнал;
+- воспроизведение с изоляцией целей, таймаутом, пропуском занятых и недоступных плееров;
+- runtime checkpoint (паттерн, цикл, ручной запуск, тишина) и восстановление после рестарта без догоняния;
+- сущности: switch расписания, switch дорожек, select пресета, sensor состояния; устройства удаляются вместе с программой;
+- WS-подписка вместо событий шины (Recorder не засоряется);
+- новая панель: Shadow DOM, автосохранение, живая сетка, мобильная раскладка, тёмная тема HA, ru/en, клавиатура, ARIA;
+- миграция хранилища v1 → v2;
+- скрипт аудиоузла для Proxmox (`scripts/proxmox/audio-node.sh`) и руководство [PROXMOX_AUDIO.md](PROXMOX_AUDIO.md);
+- 60 тестов pytest (домен + интеграция с ядром HA), CI запускает pytest на Linux.
+
+## Проверки рабочего окружения (Windows)
+
+- `python -m py_compile custom_components/hi_sosed/*.py`: пройдено;
+- JSON manifest, translations, hacs.json: пройдено; ключи ru/en совпадают;
+- `node --check` панели: пройдено;
+- `sh -n scripts/install.sh scripts/proxmox/audio-node.sh`: пройдено;
+- `PYTHONPATH=tests/windows_shims .venv/Scripts/python -m pytest`: 60 passed (HA 2026.2.3, заглушки `fcntl`/`resource`);
+- панель: smoke-сценарий в jsdom (ru и en, без JS-ошибок) и скриншоты headless Edge с моком `hass`.
 
 ## До первого релиза
 
-- запустить тесты в изолированной dev-среде с Home Assistant и `pytest-homeassistant-custom-component`;
-- добавить integration-тесты config flow, scheduler race, HTTP upload, WebSocket authorization и service calls;
-- сохранить runtime checkpoint текущего bitset/pattern для полного recovery после restart;
-- добавить switch/sensor entities и live WebSocket subscription вместо panel polling;
-- выполнить hardware probe Bluetooth bridge, усилителя и коротких клипов;
-- проверить pairing/reconnect, реальные codec formats, resume после недоступности и длительные циклы;
-- выполнить первый push в `SunsetSH/hisosed`, создать signed/pinned release tag и release notes;
-- провести HACS validation и установку на чистом Home Assistant OS.
-
-## Проверки этого рабочего окружения
-
-- Python syntax compilation: пройдено.
-- JavaScript syntax: пройдено.
-- JSON manifest/translations/HACS metadata: пройдено.
-- Shell syntax: не проверен — в Windows-окружении отсутствует `sh`/`bash`.
-- pytest: не запущен успешно — отсутствуют `homeassistant` и `voluptuous`; глобальный pytest также содержит Qt plugin без Qt dependency.
+- запуск в живом Home Assistant OS и проверка панели в браузере Windows и в Android companion app;
+- hardware probe: Bluetooth-колонка через `audio-node.sh`, USB-карта + VLC add-on, задержки после 5–30 с тишины, keep-alive;
+- Hassfest и HACS validation в CI, Ruff;
+- release tag и release notes.
