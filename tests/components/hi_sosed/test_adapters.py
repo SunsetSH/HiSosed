@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import aiohttp
 import pytest
@@ -11,12 +12,13 @@ import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.network import NoURLAvailableError
 
 from custom_components.hi_sosed.audio import beep_wav
 from custom_components.hi_sosed.const import DOMAIN, STORAGE_KEY
 from custom_components.hi_sosed.manager import ScenarioManager
 
-from .conftest import KITCHEN, add_sound, scenario_payload
+from .conftest import HALL, KITCHEN, add_sound, scenario_payload
 
 
 async def test_ws_state_save_and_errors(hass: HomeAssistant, setup_integration, hass_ws_client) -> None:
@@ -241,3 +243,55 @@ async def test_deleting_last_items_is_persisted(hass: HomeAssistant, setup_integ
     await reloaded.async_initialize()
     state = reloaded.get_state()
     assert (state["scenarios"], state["sounds"], state["outputs"]) == ([], [], [])
+
+
+def _register_mpd(hass: HomeAssistant, entity_id: str) -> None:
+    """Turn a fake player into an MPD entity without changing its id."""
+    state = hass.states.get(entity_id)
+    hass.states.async_remove(entity_id)
+    entry = er.async_get(hass).async_get_or_create(
+        "media_player", "mpd", entity_id, suggested_object_id=entity_id.split(".", 1)[1]
+    )
+    assert entry.entity_id == entity_id
+    hass.states.async_set(entity_id, state.state, state.attributes)
+
+
+async def test_mpd_players_get_capability_url(
+    hass: HomeAssistant, setup_integration, hass_client_no_auth
+) -> None:
+    """MPD probes cover.* next to the media without the signature; its URL must 404 quietly."""
+    base = "http://192.168.0.10:8123"
+    hass.config.internal_url = base
+    manager, players, _ = await setup_integration()
+    _register_mpd(hass, KITCHEN)
+    await manager.async_test_output(KITCHEN)
+    await manager.async_test_output(HALL)
+
+    url = players.plays(KITCHEN, include_system=True)[-1]
+    assert url.startswith(f"{base}/api/hi_sosed/play/")
+    assert url.endswith("/system/beep.wav")
+    assert players.plays(HALL, include_system=True)[-1].startswith("media-source://")
+
+    client = await hass_client_no_auth()
+    path = url.removeprefix(base)
+    response = await client.get(path)
+    assert response.status == 200
+    assert await response.read() == beep_wav()
+
+    token = path.split("/")[4]
+    for bad in (
+        path.replace(token, "x" * len(token)),
+        path.replace("beep.wav", "cover.png"),
+        f"/api/hi_sosed/play/{token}/system/.beep.wav.part",
+        f"/api/hi_sosed/play/{token}/%2E%2E/hi_sosed.json",
+    ):
+        assert (await client.get(bad)).status == 404, bad
+
+
+async def test_mpd_falls_back_to_media_source_without_local_url(hass: HomeAssistant, setup_integration) -> None:
+    """Without a LAN URL HA cannot build the capability URL; the signed media-source path still works."""
+    manager, players, _ = await setup_integration()
+    _register_mpd(hass, KITCHEN)
+    with patch("custom_components.hi_sosed.http.get_url", side_effect=NoURLAvailableError):
+        await manager.async_test_output(KITCHEN)
+    assert players.plays(KITCHEN, include_system=True)[-1].startswith("media-source://")

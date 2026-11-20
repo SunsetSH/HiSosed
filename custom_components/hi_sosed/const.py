@@ -20,6 +20,11 @@ PANEL_URL: Final = DOMAIN
 PANEL_COMPONENT: Final = "hi-sosed-panel"
 STATIC_URL: Final = f"/{DOMAIN}_static"
 UPLOAD_URL: Final = f"/api/{DOMAIN}/upload"
+PLAY_URL: Final = f"/api/{DOMAIN}/play"
+DATA_PLAY_TOKEN: Final = "play_token"
+# These players also fetch cover.* next to the media URL without its signature, and every
+# such request is reported by HA as a failed login. They get a capability URL instead.
+DIRECT_URL_PLATFORMS: Final = frozenset({"mpd"})
 MEDIA_SUBDIR: Final = DOMAIN
 MEDIA_SOURCE_PREFIX: Final = f"media-source://media_source/local/{MEDIA_SUBDIR}/"
 SYSTEM_SUBDIR: Final = "system"

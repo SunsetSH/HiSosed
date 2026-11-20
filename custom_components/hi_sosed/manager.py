@@ -9,10 +9,12 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from pathlib import Path
 from random import Random
+from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_point_in_time, async_track_time_interval
 from homeassistant.util import dt as dt_util
@@ -21,6 +23,7 @@ from . import files
 from .audio import starter_clips
 from .const import (
     BEEP_FILE,
+    DIRECT_URL_PLATFORMS,
     MAX_LIBRARY_BYTES,
     MAX_RUN_NOW_MINUTES,
     MAX_SNOOZE_MINUTES,
@@ -120,6 +123,8 @@ class ScenarioManager:
         self._lock = asyncio.Lock()
         self._rng = Random(secrets.randbits(64))
         self.media_dir: Path = files.media_directory(hass)
+        # Set by the integration setup: maps a managed URI to a capability URL (http.py).
+        self.direct_url: Callable[[str], str | None] | None = None
 
     # ----------------------------------------------------------------- lifecycle
 
@@ -977,7 +982,7 @@ class ScenarioManager:
             await self._async_call(
                 entity_id,
                 "play_media",
-                {"media_content_id": media_content_id, "media_content_type": "music"},
+                {"media_content_id": self._media_id_for(entity_id, media_content_id), "media_content_type": "music"},
             )
         except TimeoutError:
             return "player_timeout"
@@ -987,6 +992,15 @@ class ScenarioManager:
         finally:
             self._inflight.discard(entity_id)
         return None
+
+    def _media_id_for(self, entity_id: str, uri: str) -> str:
+        """Give MPD-like players a capability URL; everyone else gets the media-source URI."""
+        if self.direct_url is None:
+            return uri
+        entry = er.async_get(self.hass).async_get(entity_id)
+        if entry is None or entry.platform not in DIRECT_URL_PLATFORMS:
+            return uri
+        return self.direct_url(uri) or uri
 
     async def _async_call(self, entity_id: str, service: str, data: dict[str, Any]) -> None:
         async with asyncio.timeout(PLAY_TIMEOUT_SECONDS):
@@ -1019,7 +1033,10 @@ class ScenarioManager:
                     await self._async_call(
                         target,
                         "play_media",
-                        {"media_content_id": files.system_uri(SILENCE_FILE), "media_content_type": "music"},
+                        {
+                            "media_content_id": self._media_id_for(target, files.system_uri(SILENCE_FILE)),
+                            "media_content_type": "music",
+                        },
                     )
                     self._last_keepalive[target] = dt_util.now()
             except Exception as err:  # noqa: BLE001 - best effort, the window itself is unaffected

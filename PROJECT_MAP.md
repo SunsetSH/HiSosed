@@ -18,7 +18,7 @@ custom_components/hi_sosed/     # сама интеграция (HACS публи
   storage.py                    # Store v2 с миграцией + RuntimeStore (checkpoint)
   websocket_api.py              # адаптер: WS-команды панели (все require_admin)
   nodes.py                      # адаптер: подключение плееров аудиоузла через встроенный config flow MPD (ADR-0004)
-  http.py                       # адаптер: POST /api/hi_sosed/upload
+  http.py                       # адаптер: POST /api/hi_sosed/upload, GET /api/hi_sosed/play/<token>/…
   entity.py                     # база сущностей + динамическое добавление/удаление
   switch.py / select.py / sensor.py  # сущности программ, дорожек, пресетов, состояния
   panel.py                      # регистрация статики и боковой панели
@@ -101,7 +101,7 @@ panel.js ──WS──> websocket_api ─┐            switch/select/sensor �
 | Библиотека | `check_upload_quota`, `async_register_sound`, `async_add_uri_sound`, `async_update_sound`, `async_delete_sound(force)`, `async_scan_library`, `async_add_starter_pack` |
 | Планировщик | `_reschedule_locked` (перезапускает только дорожки со сменившейся `signature`), `_start_layer_locked`, `_schedule_slot_locked`, `_schedule_boundary_locked`, `_schedule_prepare_locked`, `_ensure_pattern_locked` (восстановление из checkpoint) |
 | Колбэки | `_async_fire_boundary`, `_async_fire_slot`, `_async_prepare`, `_tick` (истечение тишины, keep-alive) |
-| Воспроизведение | `_plan_play_locked` (выбор звука, политика `skip`, громкость), `_async_play_on` (одна цель: busy/unavailable/volume_set/play_media, таймаут 10 с), `_record_results` |
+| Воспроизведение | `_plan_play_locked` (выбор звука, политика `skip`, громкость), `_async_play_on` (одна цель: busy/unavailable/volume_set/play_media, таймаут 10 с), `_media_id_for` (MPD получает URL с токеном вместо media-source, ADR-0005), `_record_results` |
 
 ### Алгоритм одной клетки
 
@@ -140,6 +140,8 @@ lock: generation совпал? → played/error/skipped
 ### HTTP upload — `http.py`
 
 `POST /api/hi_sosed/upload`, multipart: необязательное поле `category`, затем `file`. Только админ, Bearer-токен. Проверки: расширение, сигнатура контейнера (`audio.sniff_matches`), ≤25 МБ, квота библиотеки 1 ГБ. Поток пишется в `.<uuid>.<ext>.part` через executor, затем `os.replace`. Ответ — объект `Sound`. Ошибки — `{code}` с HTTP 400/413/415/503/507.
+
+`GET /api/hi_sosed/play/<token>/<path>` (`PlayMediaView`, без авторизации, [ADR-0005](docs/adr/0005-player-capability-urls.md)): отдаёт аудиофайл из `<media>/hi_sosed/`, включая `system/`. Токен случайный на каждый запуск HA и хранится только в памяти (`hass.data[DOMAIN]["play_token"]`). Неверный токен, чужое расширение, скрытый файл или выход за каталог дают 404, а не 401. `direct_media_url(hass, uri)` строит такой URL от `get_url(allow_external=False)` и возвращает None, если адреса нет; тогда остаётся media-source. Менеджер получает её через `manager.direct_url` и применяет только к платформам `DIRECT_URL_PLATFORMS` (`mpd`).
 
 ### Действия (`__init__.py`, `services.yaml`)
 

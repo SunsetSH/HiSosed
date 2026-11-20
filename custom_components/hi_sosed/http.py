@@ -1,24 +1,31 @@
-"""Authenticated, size-limited audio import endpoint."""
+"""HTTP endpoints: authenticated audio import and capability URLs for players."""
 
 from __future__ import annotations
 
 import os
+import secrets
 from pathlib import Path
 from typing import IO
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 from uuid import uuid4
 
 from aiohttp import web
 
 from homeassistant.components.http.view import HomeAssistantView
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import Unauthorized
+from homeassistant.helpers.network import NoURLAvailableError, get_url
 
+from . import files
 from .audio import sniff_matches
 from .const import (
     ALLOWED_AUDIO_SUFFIXES,
     DATA_MANAGER,
+    DATA_PLAY_TOKEN,
     DOMAIN,
     MAX_UPLOAD_BYTES,
+    MEDIA_SOURCE_PREFIX,
+    PLAY_URL,
     UPLOAD_CHUNK_BYTES,
     UPLOAD_URL,
 )
@@ -118,3 +125,45 @@ class AudioUploadView(HomeAssistantView):
 
     def _error(self, code: str, status: int) -> web.Response:
         return self.json({"code": code, "message": code}, status_code=status)
+
+
+def direct_media_url(hass: HomeAssistant, uri: str) -> str | None:
+    """Return a capability URL for a managed clip, or None to keep the media-source URI."""
+    token = hass.data.get(DOMAIN, {}).get(DATA_PLAY_TOKEN)
+    if token is None or not uri.startswith(MEDIA_SOURCE_PREFIX):
+        return None
+    try:
+        base = get_url(hass, allow_external=False, allow_cloud=False)
+    except NoURLAvailableError:
+        return None
+    return f"{base}{PLAY_URL}/{token}/{quote(unquote(uri[len(MEDIA_SOURCE_PREFIX):]))}"
+
+
+class PlayMediaView(HomeAssistantView):
+    """Serve managed clips to players that cannot be given a signed URL.
+
+    The random token lives only in memory, so URLs die with an HA restart. A wrong
+    token or a missing file is a plain 404: HA does not count it as a failed login.
+    """
+
+    url = PLAY_URL + "/{token}/{location:.*}"
+    name = "api:hi_sosed:play"
+    requires_auth = False
+
+    def __init__(self, token: str) -> None:
+        self._token = token.encode()
+
+    async def get(self, request: web.Request, token: str, location: str) -> web.StreamResponse:
+        """Stream one audio file from the managed directory."""
+        hass = request.app["hass"]
+        manager = hass.data.get(DOMAIN, {}).get(DATA_MANAGER)
+        if manager is None or not secrets.compare_digest(token.encode(), self._token):
+            raise web.HTTPNotFound
+        path = files.uri_to_path(manager.media_dir, MEDIA_SOURCE_PREFIX + location, allow_system=True)
+        if (
+            path is None
+            or path.suffix.lower() not in ALLOWED_AUDIO_SUFFIXES
+            or not await hass.async_add_executor_job(path.is_file)
+        ):
+            raise web.HTTPNotFound
+        return web.FileResponse(path)

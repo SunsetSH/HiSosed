@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import secrets
+from functools import partial
 from typing import Any, Awaitable
 
 import voluptuous as vol
@@ -16,6 +18,7 @@ from homeassistant.helpers.start import async_at_started
 
 from .const import (
     DATA_MANAGER,
+    DATA_PLAY_TOKEN,
     DOMAIN,
     MAX_RUN_NOW_MINUTES,
     MAX_SNOOZE_MINUTES,
@@ -31,7 +34,7 @@ from .const import (
     SERVICE_STOP,
     SIGNAL_UPDATE,
 )
-from .http import AudioUploadView
+from .http import AudioUploadView, PlayMediaView, direct_media_url
 from .manager import ScenarioManager
 from .models import HiSosedError
 from .panel import async_register_panel
@@ -77,6 +80,8 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     hass.data.setdefault(DOMAIN, {})
     async_register_commands(hass)
     hass.http.register_view(AudioUploadView())
+    hass.data[DOMAIN][DATA_PLAY_TOKEN] = token = secrets.token_urlsafe(24)
+    hass.http.register_view(PlayMediaView(token))
     await async_register_panel(hass)
 
     handlers = {
@@ -111,6 +116,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Load persisted data, add entities and schedule when HA is running."""
     manager = ScenarioManager(hass)
+    manager.direct_url = partial(direct_media_url, hass)
     await manager.async_initialize()
     hass.data[DOMAIN][DATA_MANAGER] = manager
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

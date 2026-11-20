@@ -29,7 +29,7 @@ def system_uri(filename: str) -> str:
     return f"{MEDIA_SOURCE_PREFIX}{SYSTEM_SUBDIR}/{filename}"
 
 
-def uri_to_path(directory: Path, uri: str) -> Path | None:
+def uri_to_path(directory: Path, uri: str, *, allow_system: bool = False) -> Path | None:
     """Map a managed URI to a file strictly inside ``directory``."""
     if not uri.startswith(MEDIA_SOURCE_PREFIX):
         return None
@@ -37,7 +37,7 @@ def uri_to_path(directory: Path, uri: str) -> Path | None:
     parts = relative.split("/")
     if not 1 <= len(parts) <= 2 or any(not part or part.startswith(".") for part in parts):
         return None
-    if parts[0] == SYSTEM_SUBDIR:
+    if parts[0] == SYSTEM_SUBDIR and not allow_system:
         return None
     root = directory.resolve()
     candidate = (directory / Path(*parts)).resolve()
